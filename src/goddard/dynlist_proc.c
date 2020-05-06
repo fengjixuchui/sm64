@@ -1,9 +1,8 @@
 #include <ultra64.h>
 #include <macros.h>
-#include <config.h>
+#include <stdio.h>
 #include "gd_types.h"
 #include "bad_declarations.h"
-#include "prevent_bss_reordering.h"
 
 #include "gd_main.h"
 #include "draw_objects.h"
@@ -163,8 +162,9 @@ void reset_dynlist(void) {
 struct GdObj *proc_dynlist(struct DynList *dylist) {
     UNUSED u32 pad[2];
 
-    if (dylist++->cmd != 0xD1D4)
+    if (dylist++->cmd != 0xD1D4) {
         fatal_printf("proc_dynlist() not a valid dyn list");
+    }
 
     while (dylist->cmd != 58) {
         switch (dylist->cmd) {
@@ -200,7 +200,7 @@ struct GdObj *proc_dynlist(struct DynList *dylist) {
                 break;
             case 50:
                 d_add_valptr(Dyn1AsID(dylist), (u32) DynVecY(dylist), Dyn2AsInt(dylist),
-                             (u32) DynVecX(dylist));
+                             (size_t) DynVecX(dylist));
                 break;
             case 29:
                 d_link_with_ptr(Dyn1AsPtr(dylist));
@@ -408,10 +408,11 @@ struct DynObjInfo *get_dynobj_info(DynId id) {
         return NULL;
     }
 
-    if (sGdDynObjIdIsInt)
+    if (sGdDynObjIdIsInt) {
         sprintf(buf, "N%d", DynIdAsInt(id));
-    else
+    } else {
         gd_strcpy(buf, DynIdAsStr(id)); // strcpy
+    }
 
     gd_strcat(buf, sDynIdBuf); // strcat
     foundDynobj = NULL;
@@ -502,8 +503,9 @@ void d_make_netfromshapeid(DynId id) {
     struct DynObjInfo *dyninfo = get_dynobj_info(id);
     struct ObjNet *net;
 
-    if (dyninfo == NULL)
+    if (dyninfo == NULL) {
         fatal_printf("dMakeNetFromShape(\"%s\"): Undefined object", DynIdAsStr(id));
+    }
 
     net = make_netfromshape((struct ObjShape *) dyninfo->obj);
     add_to_dynobj_list(&net->header, NULL);
@@ -536,8 +538,9 @@ void add_to_dynobj_list(struct GdObj *newobj, DynId id) {
 
     if (sGdDynObjList == NULL) {
         sGdDynObjList = gd_malloc_temp(DYNOBJ_LIST_SIZE * sizeof(struct DynObjInfo));
-        if (sGdDynObjList == NULL)
+        if (sGdDynObjList == NULL) {
             fatal_printf("dMakeObj(): Cant allocate dynlist memory");
+        }
     }
 
     stop_memtracker("dynlist");
@@ -570,8 +573,9 @@ void add_to_dynobj_list(struct GdObj *newobj, DynId id) {
 
     // A good place to bounds-check your array is
     // after you finish writing a new member to it.
-    if (sLoadedDynObjs >= DYNOBJ_LIST_SIZE)
+    if (sLoadedDynObjs >= DYNOBJ_LIST_SIZE) {
         fatal_printf("dMakeObj(): Too many dynlist objects");
+    }
 
     sDynListCurObj = newobj;
 }
@@ -624,13 +628,10 @@ struct GdObj *d_makeobj(enum DObjTypes type, DynId id) {
             d_makeobj(D_GROUP, id);
             ((struct ObjGroup *) sDynListCurObj)->linkType = 1;
 //! @bug Returns garbage when making `D_DATA_GRP` object
-#if BUGFIX_GODDARD_MISSING_RETURN
+#ifdef AVOID_UB
             return NULL;
 #else
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
             return;
-#pragma GCC diagnostic pop
 #endif
         case D_CAMERA:
             dobj = &make_camera(0, NULL)->header;
@@ -695,12 +696,14 @@ struct GdObj *d_makeobj(enum DObjTypes type, DynId id) {
 void d_attach(DynId id) {
     struct DynObjInfo *info;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dAttach(\"%s\"): Undefined object", DynIdAsStr(id));
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -725,8 +728,9 @@ void d_attach_to(s32 flag, struct GdObj *obj) {
 
     push_dynobj_stash();
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     // find or generate attachment groups
     switch (obj->type) {
@@ -809,12 +813,14 @@ void d_attachto_dynid(s32 flag, DynId id) {
     if (id == NULL) {
         return;
     }
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dAttachTo(\"%s\"): Undefined object", DynIdAsStr(id));
+    }
 
     d_attach_to(flag, info->obj);
 }
@@ -857,11 +863,13 @@ void alloc_animdata(struct ObjAnimator *animator) {
 
     start_memtracker("animdata");
 
-    if ((animgrp = animator->animdata) == NULL)
+    if ((animgrp = animator->animdata) == NULL) {
         fatal_printf("no anim group");
+    }
 
-    if ((curAnimSrc = (struct AnimDataInfo *) animgrp->link1C->obj) == NULL)
+    if ((curAnimSrc = (struct AnimDataInfo *) animgrp->link1C->obj) == NULL) {
         fatal_printf("no animation data");
+    }
 
     // count number of array-ed animation data structs
     animDst = curAnimSrc;
@@ -871,8 +879,9 @@ void alloc_animdata(struct ObjAnimator *animator) {
     }
 
     animDst = gd_malloc_perm(animCnt * sizeof(struct AnimDataInfo)); // gd_alloc_perm
-    if ((animDataArr = animDst) == NULL)
+    if ((animDataArr = animDst) == NULL) {
         fatal_printf("cant allocate animation data");
+    }
 
     for (i = 0; i < animCnt; i++) {
         allocSpace = NULL;
@@ -906,8 +915,9 @@ void alloc_animdata(struct ObjAnimator *animator) {
             }
 
             allocSpace = gd_malloc_perm(curAnimSrc->count * datasize); // gd_alloc_perm
-            if (allocSpace == NULL)
+            if (allocSpace == NULL) {
                 fatal_printf("cant allocate animation data");
+            }
 
             if (curAnimSrc->type == GD_ANIM_9H) {
                 for (dataIdx = 0; dataIdx < curAnimSrc->count; dataIdx++) {
@@ -924,9 +934,9 @@ void alloc_animdata(struct ObjAnimator *animator) {
                     tri.p2.y = (f32)(*halfarr)[7];
                     tri.p2.z = (f32)(*halfarr)[8];
 
-                    set_identity_mat4(&curMtxVec->matrix);
-                    func_80194220(&curMtxVec->matrix, &tri.p1);
-                    func_801942E4(&curMtxVec->matrix, &tri.p2);
+                    gd_set_identity_mat4(&curMtxVec->matrix);
+                    gd_rot_mat_about_vec(&curMtxVec->matrix, &tri.p1);
+                    gd_add_vec3f_to_mat4f_offset(&curMtxVec->matrix, &tri.p2);
 
                     ((struct AnimMtxVec *) allocSpace)[dataIdx].vec.x = tri.p0.x;
                     ((struct AnimMtxVec *) allocSpace)[dataIdx].vec.y = tri.p0.y;
@@ -979,20 +989,23 @@ void chk_shapegen(struct ObjShape *shape) {
     shapeFaces = shape->faceGroup;
     shapeVtx = shape->vtxGroup;
 
-    if (shapeVtx != NULL && shapeFaces != NULL)
+    if (shapeVtx != NULL && shapeFaces != NULL) {
         if ((shapeVtx->linkType & 1) && (shapeFaces->linkType & 1)) //? needs the double if
         {
             // These Links point to special, compressed data structures
             vtxdata = (struct GdVtxData *) shapeVtx->link1C->obj;
             facedata = (struct GdFaceData *) shapeFaces->link1C->obj;
-            if (facedata->type != 1)
+            if (facedata->type != 1) {
                 fatal_printf("unsupported poly type");
+            }
 
-            if (vtxdata->type != 1)
+            if (vtxdata->type != 1) {
                 fatal_printf("unsupported vertex type");
+            }
 
-            if (vtxdata->count >= VTX_BUF_SIZE)
+            if (vtxdata->count >= VTX_BUF_SIZE) {
                 fatal_printf("shapegen() too many vertices");
+            }
 
             vtxbuf = gd_malloc_temp(VTX_BUF_SIZE * sizeof(struct ObjVertex *));
             oldObjHead = gGdObjectList;
@@ -1032,11 +1045,11 @@ void chk_shapegen(struct ObjShape *shape) {
                     vtxbuf[i]->normal.x = vtxbuf[i]->pos.x;
                     vtxbuf[i]->normal.y = vtxbuf[i]->pos.y;
                     vtxbuf[i]->normal.z = vtxbuf[i]->pos.z;
-                    into_unit_vec3f(&vtxbuf[i]->normal);
+                    gd_normalize_vec3f(&vtxbuf[i]->normal);
                 }
             } else {
                 for (i = 0; i < vtxdata->count; i++) {
-                    into_unit_vec3f(&vtxbuf[i]->normal);
+                    gd_normalize_vec3f(&vtxbuf[i]->normal);
                 }
             }
 
@@ -1045,6 +1058,7 @@ void chk_shapegen(struct ObjShape *shape) {
             shape->faceGroup = madeFaces;
             shape->vtxGroup = madeVtx;
         }
+    }
 
     if (shapeMtls != NULL) {
         if (shape->faceGroup) {
@@ -1070,12 +1084,14 @@ void d_set_nodegroup(DynId id) {
     struct DynObjInfo *info; // sp2C
     UNUSED u32 pad[2];
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dSetNodeGroup(\"%s\"): Undefined group", DynIdAsStr(id));
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -1105,12 +1121,14 @@ void d_set_nodegroup(DynId id) {
 void d_set_matgroup(DynId id) {
     struct DynObjInfo *info; // sp1C
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dSetMatGroup(\"%s\"): Undefined group", DynIdAsStr(id));
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_SHAPES:
@@ -1132,8 +1150,9 @@ void d_set_matgroup(DynId id) {
 void d_set_texture_st(UNUSED f32 s, UNUSED f32 t) {
     UNUSED u32 pad[2];
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_VERTICES:
@@ -1148,8 +1167,9 @@ void d_set_texture_st(UNUSED f32 s, UNUSED f32 t) {
  * Set the texture pointer of the current dynamic `ObjMaterial`.
  */
 void d_use_texture(void *texture) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_MATERIALS:
@@ -1168,12 +1188,14 @@ void d_use_texture(void *texture) {
 void d_set_skinshape(DynId id) {
     struct DynObjInfo *info;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dSetSkinShape(\"%s\"): Undefined object", DynIdAsStr(id));
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -1194,12 +1216,14 @@ void d_set_skinshape(DynId id) {
 void d_map_materials(DynId id) {
     struct DynObjInfo *info;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dMapMaterials(\"%s\"): Undefined group", DynIdAsStr(id));
+    }
 
     map_face_materials((struct ObjGroup *) sDynListCurObj, (struct ObjGroup *) info->obj);
 }
@@ -1213,12 +1237,14 @@ void d_map_materials(DynId id) {
 void d_map_vertices(DynId id) {
     struct DynObjInfo *info;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dMapVertices(\"%s\"): Undefined group", DynIdAsStr(id));
+    }
 
     map_vertices((struct ObjGroup *) sDynListCurObj, (struct ObjGroup *) info->obj);
 }
@@ -1233,12 +1259,14 @@ void d_set_planegroup(DynId id) {
     struct DynObjInfo *info; // sp2C
     UNUSED u32 pad[2];
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dSetPlaneGroup(\"%s\"): Undefined group", DynIdAsStr(id));
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -1261,11 +1289,13 @@ void d_set_planegroup(DynId id) {
 void d_set_shapeptrptr(struct ObjShape **shpPtrptr) {
     struct ObjShape *defaultptr = NULL;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
-    if (shpPtrptr == NULL)
+    if (shpPtrptr == NULL) {
         shpPtrptr = &defaultptr;
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1304,8 +1334,9 @@ void d_set_shapeptr(DynId id) {
     }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dSetShapePtr(\"%s\"): Undefined object", DynIdAsStr(id));
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1335,8 +1366,9 @@ void d_set_shapeptr(DynId id) {
  */
 struct GdObj *d_use_obj(DynId id) {
     struct DynObjInfo *info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dUseObj(\"%s\"): Undefined object", DynIdAsStr(id));
+    }
 
     sDynListCurObj = info->obj;
     sDynListCurInfo = info;
@@ -1371,8 +1403,9 @@ void d_end_group(DynId id) {
     struct ObjGroup *dynGrp;                       // sp1C
     s32 i;                                         // sp18
 
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dEndGroup(\"%s\"): Undefined group", DynIdAsStr(id));
+    }
 
     dynGrp = (struct ObjGroup *) info->obj;
     for (i = info->num + 1; i < sLoadedDynObjs; i++) {
@@ -1390,8 +1423,9 @@ void d_addto_group(DynId id) {
     struct DynObjInfo *info = get_dynobj_info(id); // sp20
     struct ObjGroup *targetGrp;
 
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dAddToGroup(\"%s\"): Undefined group", DynIdAsStr(id));
+    }
 
     targetGrp = (struct ObjGroup *) info->obj;
     addto_group(targetGrp, sDynListCurObj);
@@ -1416,8 +1450,9 @@ void d_set_init_pos(f32 x, f32 y, f32 z) {
     struct GdObj *dynobj = sDynListCurObj; // sp28
     UNUSED u32 pad[1];
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1472,8 +1507,9 @@ void d_set_init_pos(f32 x, f32 y, f32 z) {
 void d_set_velocity(const struct GdVec3f *vel) {
     struct GdObj *dynobj = sDynListCurObj;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1500,8 +1536,9 @@ void d_set_velocity(const struct GdVec3f *vel) {
 void d_get_velocity(struct GdVec3f *dst) {
     struct GdObj *dynobj = sDynListCurObj;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1529,8 +1566,9 @@ void d_get_velocity(struct GdVec3f *dst) {
 void d_set_torque(const struct GdVec3f *src) {
     struct GdObj *dynobj = sDynListCurObj;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -1551,8 +1589,9 @@ void d_set_torque(const struct GdVec3f *src) {
 void d_get_init_pos(struct GdVec3f *dst) {
     struct GdObj *dynobj = sDynListCurObj;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1583,8 +1622,9 @@ void d_get_init_pos(struct GdVec3f *dst) {
 void d_get_init_rot(struct GdVec3f *dst) {
     struct GdObj *dynobj = sDynListCurObj;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1616,8 +1656,9 @@ void d_set_rel_pos(f32 x, f32 y, f32 z) {
     struct GdObj *dynobj = sDynListCurObj; // sp34
     UNUSED struct GdVec3f unusedVec;       // sp28
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1677,8 +1718,9 @@ void d_set_rel_pos(f32 x, f32 y, f32 z) {
 void d_addto_rel_pos(struct GdVec3f *src) {
     struct GdObj *dynobj = sDynListCurObj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_VERTICES:
@@ -1706,8 +1748,9 @@ void d_addto_rel_pos(struct GdVec3f *src) {
  * Store the current dynamic object's position into `dst`.
  */
 void d_get_rel_pos(struct GdVec3f *dst) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_VERTICES:
@@ -1741,8 +1784,9 @@ void d_get_rel_pos(struct GdVec3f *dst) {
  * dynamic object.
  */
 struct ObjGroup *d_get_att_objgroup(void) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1762,8 +1806,9 @@ struct ObjGroup *d_get_att_objgroup(void) {
  * Return a pointer to the attached object of the current dynamic object.
  */
 struct GdObj *d_get_att_to_obj(void) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1785,8 +1830,9 @@ struct GdObj *d_get_att_to_obj(void) {
 void d_get_scale(struct GdVec3f *dst) {
     struct GdObj *dynobj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
@@ -1817,8 +1863,9 @@ void d_get_scale(struct GdVec3f *dst) {
 void d_set_att_offset(const struct GdVec3f *off) {
     struct GdObj *dynobj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
@@ -1860,8 +1907,9 @@ void d_set_att_to_offset(UNUSED u32 a) {
     struct GdObj *dynobj; // sp3c
     UNUSED u8 pad[24];
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     push_dynobj_stash();
@@ -1894,8 +1942,9 @@ void d_set_att_to_offset(UNUSED u32 a) {
  * @note Not called
  */
 void d_get_att_offset(struct GdVec3f *dst) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1922,8 +1971,9 @@ void d_get_att_offset(struct GdVec3f *dst) {
 s32 d_get_att_flags(void) {
     s32 attflag; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -1949,8 +1999,9 @@ s32 d_get_att_flags(void) {
  * @note Sets the upper left coordinates of an `ObjView`
  */
 void d_set_world_pos(f32 x, f32 y, f32 z) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_CAMERAS:
@@ -1996,13 +2047,14 @@ void d_set_world_pos(f32 x, f32 y, f32 z) {
 void d_set_normal(f32 x, f32 y, f32 z) {
     struct GdVec3f normal; // sp1C
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     normal.x = x;
     normal.y = y;
     normal.z = z;
-    into_unit_vec3f(&normal);
+    gd_normalize_vec3f(&normal);
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_VERTICES:
@@ -2023,8 +2075,9 @@ void d_set_normal(f32 x, f32 y, f32 z) {
  * @note Not called.
  */
 struct GdVec3f *d_get_world_pos_ptr(void) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_VERTICES:
@@ -2044,8 +2097,9 @@ struct GdVec3f *d_get_world_pos_ptr(void) {
  * Copy the world position of the current dynamic object into `dst`.
  */
 void d_get_world_pos(struct GdVec3f *dst) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_VERTICES:
@@ -2144,8 +2198,9 @@ void d_make_vertex(struct GdVec3f *pos) {
 void d_set_scale(f32 x, f32 y, f32 z) {
     struct GdObj *initDynobj; // sp24;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     initDynobj = sDynListCurObj;
     push_dynobj_stash();
@@ -2191,8 +2246,9 @@ void d_set_rotation(f32 x, f32 y, f32 z) {
     struct GdObj *dynobj; // sp2C
     UNUSED u32 pad;
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
@@ -2216,8 +2272,9 @@ void d_set_rotation(f32 x, f32 y, f32 z) {
  * Set the center of gravity of the current dynamic `ObjNet`.
  */
 void d_center_of_gravity(f32 x, f32 y, f32 z) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -2235,8 +2292,9 @@ void d_center_of_gravity(f32 x, f32 y, f32 z) {
  * Set the shape offset of the current dynamic `ObjJoint`.
  */
 void d_set_shape_offset(f32 x, f32 y, f32 z) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -2256,20 +2314,22 @@ void d_set_shape_offset(f32 x, f32 y, f32 z) {
  *
  * @param type `::ValPtrType`
  */
-void d_add_valptr(DynId objId, u32 vflags, s32 type, u32 offset) {
+void d_add_valptr(DynId objId, u32 vflags, s32 type, size_t offset) {
     struct GdObj *dynobj;      // sp2C
     struct ObjValPtrs *valptr; // sp28
     struct DynObjInfo *info;   // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
 
     if (vflags == 0x40000) {
         info = get_dynobj_info(objId);
-        if (info == NULL)
+        if (info == NULL) {
             fatal_printf("dAddValPtr(\"%s\"): Undefined object", DynIdAsStr(objId));
+        }
 
         valptr = make_valptrs(info->obj, vflags, type, offset);
     } else {
@@ -2299,8 +2359,9 @@ void d_add_valptr(DynId objId, u32 vflags, s32 type, u32 offset) {
 void d_add_valproc(valptrproc_t proc) {
     struct GdObj *dynobj; // sp1C
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
@@ -2323,8 +2384,9 @@ void d_link_with_ptr(void *ptr) {
     struct ObjValPtrs *valptr; // sp30
     struct Links *link;        // sp2C
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     add_to_stacktrace("dLinkWithPtr");
@@ -2350,19 +2412,22 @@ void d_link_with_ptr(void *ptr) {
             reset_nets_and_gadgets(((struct ObjView *) dynobj)->components);
             break;
         case OBJ_TYPE_FACES:
-            if (((struct ObjFace *) dynobj)->vtxCount >= 4)
+            if (((struct ObjFace *) dynobj)->vtxCount >= 4) {
                 fatal_printf("too many points");
+            }
 
             ((struct ObjFace *) dynobj)->vertices[((struct ObjFace *) dynobj)->vtxCount] = ptr;
             ((struct ObjFace *) dynobj)->vtxCount++;
 
-            if (((struct ObjFace *) dynobj)->vtxCount >= 3)
+            if (((struct ObjFace *) dynobj)->vtxCount >= 3) {
                 calc_face_normal((struct ObjFace *) dynobj);
+            }
 
             break;
         case OBJ_TYPE_ANIMATORS:
-            if (((struct ObjAnimator *) dynobj)->unk14 == NULL)
+            if (((struct ObjAnimator *) dynobj)->unk14 == NULL) {
                 ((struct ObjAnimator *) dynobj)->unk14 = make_group(0);
+            }
 
             addto_group(((struct ObjAnimator *) dynobj)->unk14, ptr);
             break;
@@ -2385,16 +2450,18 @@ void d_link_with(DynId id) {
     struct DynObjInfo *info;                       // sp1C
     struct DynObjInfo *origInfo = sDynListCurInfo; // sp18
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     if (id == NULL) {
         return;
     }
 
     info = get_dynobj_info(id);
-    if (info == NULL)
+    if (info == NULL) {
         fatal_printf("dLinkWith(\"%s\"): Undefined object", DynIdAsStr(id));
+    }
 
     d_link_with_ptr(info->obj);
     set_cur_dynobj(origInfo->obj);
@@ -2407,8 +2474,9 @@ void d_link_with(DynId id) {
 void d_set_flags(s32 flags) {
     struct GdObj *dynobj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
@@ -2446,8 +2514,9 @@ void d_set_flags(s32 flags) {
  * Clear object specific flags from the current dynamic object.
  */
 void d_clear_flags(s32 flags) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -2477,8 +2546,9 @@ void d_clear_flags(s32 flags) {
  * range.
  */
 void d_set_parm_f(enum DParmF param, f32 val) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_SHAPES:
@@ -2532,8 +2602,9 @@ void d_set_parm_f(enum DParmF param, f32 val) {
  * but it can also set the vertices for an `ObjFace`.
  */
 void d_set_parm_ptr(enum DParmPtr param, void *ptr) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_LABELS:
@@ -2577,8 +2648,9 @@ void d_set_parm_ptr(enum DParmPtr param, void *ptr) {
  * Set the generic drawing flags for the current dynamic object.
  */
 void d_set_obj_draw_flag(enum ObjDrawingFlags flag) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     sDynListCurObj->drawFlags |= flag;
 }
@@ -2589,8 +2661,9 @@ void d_set_obj_draw_flag(enum ObjDrawingFlags flag) {
 void d_set_type(s32 type) {
     struct GdObj *dynobj = sDynListCurObj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -2623,8 +2696,9 @@ void d_set_type(s32 type) {
 void d_set_id(s32 id) {
     struct GdObj *dynobj = sDynListCurObj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_MATERIALS:
@@ -2653,8 +2727,9 @@ void d_set_id(s32 id) {
 void d_set_colour_num(s32 colornum) {
     struct GdColour *rgbcolor; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -2690,8 +2765,9 @@ void d_set_colour_num(s32 colornum) {
  * Set the material ID of the current dynamic `ObjFace`.
  */
 void d_set_material(UNUSED void *a0, s32 mtlId) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_FACES:
@@ -2707,8 +2783,9 @@ void d_set_material(UNUSED void *a0, s32 mtlId) {
  * Set the friction vec of the current dynamic `ObjJoint`.
  */
 void d_friction(f32 x, f32 y, f32 z) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
@@ -2726,8 +2803,9 @@ void d_friction(f32 x, f32 y, f32 z) {
  * Set the spring constant of the current dynamic `ObjBone`.
  */
 void d_set_spring(f32 spring) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_BONES:
@@ -2743,8 +2821,9 @@ void d_set_spring(f32 spring) {
  * Set the ambient color of the current dynamic `ObjMaterial`.
  */
 void d_set_ambient(f32 r, f32 g, f32 b) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_MATERIALS:
@@ -2762,8 +2841,9 @@ void d_set_ambient(f32 r, f32 g, f32 b) {
  * Set the diffuse color of the current dynamic `ObjMaterial` or `ObjLight`.
  */
 void d_set_diffuse(f32 r, f32 g, f32 b) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_MATERIALS:
@@ -2786,8 +2866,9 @@ void d_set_diffuse(f32 r, f32 g, f32 b) {
  * Set the control type of the current dynamic `ObjNet`.
  */
 void d_set_control_type(s32 ctrltype) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -2805,8 +2886,9 @@ void d_set_control_type(s32 ctrltype) {
  * a global plane at (0,0) is returned.
  */
 struct GdPlaneF *d_get_plane(void) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -2829,26 +2911,27 @@ struct GdPlaneF *d_get_plane(void) {
 void d_get_matrix(Mat4f *dst) {
     struct GdObj *dynobj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
-            cpy_mat4(&((struct ObjNet *) dynobj)->mat128, dst);
+            gd_copy_mat4f(&((struct ObjNet *) dynobj)->mat128, dst);
             break;
             break; // lol
         case OBJ_TYPE_JOINTS:
-            cpy_mat4(&((struct ObjJoint *) dynobj)->matE8, dst);
+            gd_copy_mat4f(&((struct ObjJoint *) dynobj)->matE8, dst);
             break;
         case OBJ_TYPE_CAMERAS:
-            cpy_mat4(&((struct ObjCamera *) dynobj)->unkE8, dst);
+            gd_copy_mat4f(&((struct ObjCamera *) dynobj)->unkE8, dst);
             break;
         case OBJ_TYPE_PARTICLES:
-            set_identity_mat4(dst);
+            gd_set_identity_mat4(dst);
             break;
         case OBJ_TYPE_SHAPES:
-            set_identity_mat4(dst);
+            gd_set_identity_mat4(dst);
             break;
         default:
             fatal_printf("%s: Object '%s'(%x) does not support this function.", "dGetMatrix()",
@@ -2860,21 +2943,22 @@ void d_get_matrix(Mat4f *dst) {
  * Set the matrix of the current dynamic object by copying `src` into the object.
  */
 void d_set_matrix(Mat4f *src) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
-            cpy_mat4(src, &((struct ObjNet *) sDynListCurObj)->mat128);
+            gd_copy_mat4f(src, &((struct ObjNet *) sDynListCurObj)->mat128);
             //! @bug When setting an `ObjNet` matrix, the source is copied twice
             //!      due to a probable copy-paste line repeat error
-            cpy_mat4(src, &((struct ObjNet *) sDynListCurObj)->mat128);
+            gd_copy_mat4f(src, &((struct ObjNet *) sDynListCurObj)->mat128);
             break;
         case OBJ_TYPE_JOINTS:
-            cpy_mat4(src, &((struct ObjJoint *) sDynListCurObj)->matE8);
+            gd_copy_mat4f(src, &((struct ObjJoint *) sDynListCurObj)->matE8);
             break;
         case OBJ_TYPE_CAMERAS:
-            cpy_mat4(src, &((struct ObjCamera *) sDynListCurObj)->unk64);
+            gd_copy_mat4f(src, &((struct ObjCamera *) sDynListCurObj)->unk64);
             break;
         default:
             fatal_printf("%s: Object '%s'(%x) does not support this function.", "dSetMatrix()",
@@ -2887,15 +2971,16 @@ void d_set_matrix(Mat4f *src) {
  * the input matrix `src`.
  */
 void d_set_rot_mtx(Mat4f *src) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
-            cpy_mat4(src, &((struct ObjJoint *) sDynListCurObj)->mat128);
+            gd_copy_mat4f(src, &((struct ObjJoint *) sDynListCurObj)->mat128);
             break;
         case OBJ_TYPE_NETS:
-            cpy_mat4(src, &((struct ObjJoint *) sDynListCurObj)->mat168);
+            gd_copy_mat4f(src, &((struct ObjNet *) sDynListCurObj)->mat168);
             break;
         default:
             fatal_printf("%s: Object '%s'(%x) does not support this function.", "dSetRMatrix()",
@@ -2907,14 +2992,15 @@ void d_set_rot_mtx(Mat4f *src) {
  * Get a pointer to the current dynamic object's rotation matrix.
  */
 Mat4f *d_get_rot_mtx_ptr(void) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:
             return &((struct ObjJoint *) sDynListCurObj)->mat128;
         case OBJ_TYPE_NETS:
-            return &((struct ObjJoint *) sDynListCurObj)->mat168;
+            return &((struct ObjNet *) sDynListCurObj)->mat168;
         default:
             fatal_printf("%s: Object '%s'(%x) does not support this function.", "dGetRMatrixPtr()",
                          sDynListCurInfo->name, sDynListCurObj->type);
@@ -2928,16 +3014,17 @@ Mat4f *d_get_rot_mtx_ptr(void) {
 void d_set_idn_mtx(Mat4f *src) {
     struct GdObj *dynobj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
-            cpy_mat4(src, &((struct ObjNet *) dynobj)->matE8);
+            gd_copy_mat4f(src, &((struct ObjNet *) dynobj)->matE8);
             break;
         case OBJ_TYPE_JOINTS:
-            cpy_mat4(src, &((struct ObjNet *) dynobj)->mat168);
+            gd_copy_mat4f(src, &((struct ObjJoint *) dynobj)->mat168);
             break;
         case OBJ_TYPE_LIGHTS:
             ((struct ObjLight *) dynobj)->position.x = (*src)[3][0];
@@ -2954,8 +3041,9 @@ void d_set_idn_mtx(Mat4f *src) {
  * Get a pointer to the current dynamic object's matrix.
  */
 Mat4f *d_get_matrix_ptr(void) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_NETS:
@@ -2983,8 +3071,9 @@ Mat4f *d_get_matrix_ptr(void) {
 Mat4f *d_get_idn_mtx_ptr(void) {
     struct GdObj *dynobj; // sp24
 
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     dynobj = sDynListCurObj;
     switch (sDynListCurObj->type) {
@@ -3019,7 +3108,7 @@ f32 d_calc_world_dist_btwn(struct GdObj *obj1, struct GdObj *obj2) {
     posdiff.y = obj2pos.y - obj1pos.y;
     posdiff.z = obj2pos.z - obj1pos.z;
 
-    return magnitude_vec3f(&posdiff);
+    return gd_vec3f_magnitude(&posdiff);
 }
 
 /**
@@ -3027,8 +3116,9 @@ f32 d_calc_world_dist_btwn(struct GdObj *obj1, struct GdObj *obj2) {
  * is out of 100.
  */
 void d_set_skin_weight(s32 id, f32 percentWeight) {
-    if (sDynListCurObj == NULL)
+    if (sDynListCurObj == NULL) {
         fatal_printf("proc_dynlist(): No current object");
+    }
 
     switch (sDynListCurObj->type) {
         case OBJ_TYPE_JOINTS:

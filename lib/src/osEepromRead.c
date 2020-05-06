@@ -1,7 +1,5 @@
 #include "libultra_internal.h"
 
-extern u32 D_80365E00[15];
-extern u32 D_80365E3C;
 extern u8 D_80365D20;
 
 typedef struct {
@@ -40,8 +38,9 @@ s32 osEepromRead(OSMesgQueue *mq, u8 address, u8 *buffer) {
     sp34 = 0;
     sp30 = 0;
     sp2c = (u8 *) &D_80365E00;
-    if (address > 0x40)
+    if (address > 0x40) {
         return -1;
+    }
     __osSiGetAccess();
     sp34 = __osEepStatus(mq, &sp28);
     if (sp34 != 0 || sp28.unk00 != 0x8000) {

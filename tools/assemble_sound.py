@@ -12,6 +12,8 @@ TYPE_TBL = 2
 
 STACK_TRACES = False
 DUMP_INDIVIDUAL_BINS = False
+ENDIAN_MARKER = ">"
+WORD_BYTES = 4
 
 orderedJsonDecoder = JSONDecoder(object_pairs_hook=OrderedDict)
 
@@ -31,7 +33,7 @@ class Aifc:
 class SampleBank:
     def __init__(self, name, entries):
         self.name = name
-        self.uses = 0
+        self.uses = []
         self.entries = entries
         self.name_to_entry = {}
         for e in entries:
@@ -64,6 +66,14 @@ def validate(cond, msg, forstr=""):
 def strip_comments(string):
     string = re.sub(re.compile("/\*.*?\*/", re.DOTALL), "", string)
     return re.sub(re.compile("//.*?\n"), "", string)
+
+
+def pack(fmt, *args):
+    if WORD_BYTES == 4:
+        fmt = fmt.replace('P', 'I').replace('X', '')
+    else:
+        fmt = fmt.replace('P', 'Q').replace('X', 'xxxx')
+    return struct.pack(ENDIAN_MARKER + fmt, *args)
 
 
 def to_bcd(num):
@@ -285,7 +295,7 @@ def validate_bank_toplevel(json):
     )
 
 
-def make_sound_json_uniform(json):
+def normalize_sound_json(json):
     # Convert {"sound": "str"} into {"sound": {"sample": "str"}}
     fixup = []
     for inst in json["instruments"].values():
@@ -457,7 +467,7 @@ def apply_version_diffs(json, defines):
 
 
 def mark_sample_bank_uses(bank):
-    bank.sample_bank.uses += 1
+    bank.sample_bank.uses.append(bank)
 
     def mark_used(name):
         bank.sample_bank.name_to_entry[name].used = True
@@ -488,23 +498,23 @@ def serialize_ctl(bank, base_ser):
     y, m, d = map(int, json.get("date", "0000-00-00").split("-"))
     date = y * 10000 + m * 100 + d
     base_ser.add(
-        struct.pack(
-            ">IIII",
+        pack(
+            "IIII",
             len(json["instrument_list"]),
             len(drums),
-            1 if bank.sample_bank.uses > 1 else 0,
+            1 if len(bank.sample_bank.uses) > 1 else 0,
             to_bcd(date),
         )
     )
 
     ser = ReserveSerializer()
     if drums:
-        drum_pos_buf = ser.reserve(4)
+        drum_pos_buf = ser.reserve(WORD_BYTES)
     else:
-        ser.add(b"\0" * 4)
+        ser.add(b"\0" * WORD_BYTES)
         drum_pos_buf = None
 
-    inst_pos_buf = ser.reserve(4 * len(json["instrument_list"]))
+    inst_pos_buf = ser.reserve(WORD_BYTES * len(json["instrument_list"]))
     ser.align(16)
 
     used_samples = []
@@ -528,32 +538,30 @@ def serialize_ctl(bank, base_ser):
         sample_len = len(aifc.data)
 
         # Sample
-        ser.add(struct.pack(">II", 0, aifc.offset))
-        loop_addr_buf = ser.reserve(4)
-        book_addr_buf = ser.reserve(4)
-        ser.add(struct.pack(">I", align(sample_len, 2)))
+        ser.add(pack("PP", 0, aifc.offset))
+        loop_addr_buf = ser.reserve(WORD_BYTES)
+        book_addr_buf = ser.reserve(WORD_BYTES)
+        ser.add(pack("I", align(sample_len, 2)))
         ser.align(16)
 
         # Book
-        book_addr_buf.append(struct.pack(">I", ser.size))
-        ser.add(struct.pack(">ii", aifc.book.order, aifc.book.npredictors))
+        book_addr_buf.append(pack("P", ser.size))
+        ser.add(pack("ii", aifc.book.order, aifc.book.npredictors))
         for x in aifc.book.table:
-            ser.add(struct.pack(">h", x))
+            ser.add(pack("h", x))
         ser.align(16)
 
         # Loop
-        loop_addr_buf.append(struct.pack(">I", ser.size))
+        loop_addr_buf.append(pack("P", ser.size))
         if aifc.loop is None:
             assert sample_len % 9 in [0, 1]
             end = sample_len // 9 * 16 + (sample_len % 2) + (sample_len % 9)
-            ser.add(struct.pack(">IIiI", 0, end, 0, 0))
+            ser.add(pack("IIiI", 0, end, 0, 0))
         else:
-            ser.add(
-                struct.pack(">IIiI", aifc.loop.start, aifc.loop.end, aifc.loop.count, 0)
-            )
+            ser.add(pack("IIiI", aifc.loop.start, aifc.loop.end, aifc.loop.count, 0))
             assert aifc.loop.count != 0
             for x in aifc.loop.state:
-                ser.add(struct.pack(">h", x))
+                ser.add(pack("h", x))
         ser.align(16)
 
     env_name_to_addr = {}
@@ -568,6 +576,8 @@ def serialize_ctl(bank, base_ser):
                 entry = [2 ** 16 - 3, 0]
             elif entry[0] == "goto":
                 entry[0] = 2 ** 16 - 2
+            # Envelopes are always written as big endian, to match sequence files
+            # which are byte blobs and can embed envelopes.
             ser.add(struct.pack(">HH", *entry))
         ser.align(16)
 
@@ -580,7 +590,7 @@ def serialize_ctl(bank, base_ser):
         else:
             aifc = bank.sample_bank.name_to_entry[sound["sample"]]
             tuning = aifc.sample_rate / 32000
-        ser.add(struct.pack(">If", sample_addr, tuning))
+        ser.add(pack("PfX", sample_addr, tuning))
 
     no_sound = {"sample": None, "tuning": 0.0}
 
@@ -591,8 +601,8 @@ def serialize_ctl(bank, base_ser):
         inst_name_to_pos[name] = ser.size
         env_addr = env_name_to_addr[inst["envelope"]]
         ser.add(
-            struct.pack(
-                ">BBBBI",
+            pack(
+                "BBBBXP",
                 0,
                 inst.get("normal_range_lo", 0),
                 inst.get("normal_range_hi", 127),
@@ -607,23 +617,23 @@ def serialize_ctl(bank, base_ser):
 
     for name in json["instrument_list"]:
         if name is None:
-            inst_pos_buf.append(struct.pack(">I", 0))
+            inst_pos_buf.append(pack("P", 0))
             continue
-        inst_pos_buf.append(struct.pack(">I", inst_name_to_pos[name]))
+        inst_pos_buf.append(pack("P", inst_name_to_pos[name]))
 
     if drums:
         drum_poses = []
         for drum in drums:
             drum_poses.append(ser.size)
-            ser.add(struct.pack(">BBBB", drum["release_rate"], drum["pan"], 0, 0))
+            ser.add(pack("BBBBX", drum["release_rate"], drum["pan"], 0, 0))
             ser_sound(drum["sound"])
             env_addr = env_name_to_addr[drum["envelope"]]
-            ser.add(struct.pack(">I", env_addr))
+            ser.add(pack("P", env_addr))
         ser.align(16)
 
-        drum_pos_buf.append(struct.pack(">I", ser.size))
+        drum_pos_buf.append(pack("P", ser.size))
         for pos in drum_poses:
-            ser.add(struct.pack(">I", pos))
+            ser.add(pack("P", pos))
         ser.align(16)
 
     base_ser.add(ser.finish())
@@ -644,8 +654,8 @@ def serialize_tbl(sample_bank, ser):
 
 def serialize_seqfile(entries, serialize_entry, entry_list, magic, extra_padding=True):
     ser = ReserveSerializer()
-    ser.add(struct.pack(">HH", magic, len(entry_list)))
-    table = ser.reserve(len(entry_list) * 8)
+    ser.add(pack("HHX", magic, len(entry_list)))
+    table = ser.reserve(len(entry_list) * 2 * WORD_BYTES)
     ser.align(16)
     data_start = ser.size
 
@@ -662,46 +672,174 @@ def serialize_seqfile(entries, serialize_entry, entry_list, magic, extra_padding
     ser.align(64)
 
     for ent in entry_list:
-        table.append(struct.pack(">I", entry_offsets[ent] + data_start))
-        table.append(struct.pack(">I", entry_lens[ent]))
+        table.append(pack("P", entry_offsets[ent] + data_start))
+        table.append(pack("IX", entry_lens[ent]))
     return ser.finish()
 
 
-def write_sequences(inputs, out_filename):
-    inputs.sort(key=lambda f: os.path.basename(f))
+def validate_and_normalize_sequence_json(json, bank_names, defines):
+    validate(isinstance(json, dict), "must have a top-level object")
+    if "comment" in json:
+        del json["comment"]
+    for key, seq in json.items():
+        if isinstance(seq, dict):
+            validate_json_format(seq, {"ifdef": list, "banks": list}, key)
+            validate(
+                all(isinstance(x, str) for x in seq["ifdef"]),
+                '"ifdef" must be an array of strings',
+                key,
+            )
+            if all(d not in defines for d in seq["ifdef"]):
+                seq = None
+            else:
+                seq = seq["banks"]
+            json[key] = seq
+        if isinstance(seq, list):
+            for x in seq:
+                validate(
+                    isinstance(x, str), "bank list must be an array of strings", key
+                )
+                validate(
+                    x in bank_names, "reference to non-existing sound bank " + x, key
+                )
+        else:
+            validate(seq is None, "bad JSON type, expected null, array or object", key)
 
-    def serialize_file(fname, ser):
+
+def write_sequences(
+    inputs, out_filename, out_bank_sets, sound_bank_dir, seq_json, defines
+):
+    bank_names = sorted(
+        [os.path.splitext(os.path.basename(x))[0] for x in os.listdir(sound_bank_dir)]
+    )
+
+    try:
+        with open(seq_json, "r") as inf:
+            data = inf.read()
+            data = strip_comments(data)
+            json = orderedJsonDecoder.decode(data)
+            validate_and_normalize_sequence_json(json, bank_names, defines)
+
+    except Exception as e:
+        fail("failed to parse " + str(seq_json) + ": " + str(e))
+
+    inputs.sort(key=lambda f: os.path.basename(f))
+    name_to_fname = {}
+    for fname in inputs:
+        name = os.path.splitext(os.path.basename(fname))[0]
+        if name in name_to_fname:
+            fail(
+                "Files "
+                + fname
+                + " and "
+                + name_to_fname[name]
+                + " conflict. Remove one of them."
+            )
+        name_to_fname[name] = fname
+        if name not in json:
+            fail(
+                "Sequence file " + fname + " is not mentioned in sequences.json. "
+                "Either assign it a list of sound banks, or set it to null to "
+                "explicitly leave it out from the build."
+            )
+
+    for key, seq in json.items():
+        if key not in name_to_fname and seq is not None:
+            fail(
+                "sequences.json assigns sound banks to "
+                + key
+                + ", but there is no such sequence file. Either remove the entry (or "
+                "set it to null), or create sound/sequences/" + key + ".m64."
+            )
+
+    ind_to_name = []
+    for key in json:
+        ind = int(key.split("_")[0], 16)
+        while len(ind_to_name) <= ind:
+            ind_to_name.append(None)
+        if ind_to_name[ind] is not None:
+            fail(
+                "Sequence files "
+                + key
+                + " and "
+                + ind_to_name[ind]
+                + " have the same index. Renumber or delete one of them."
+            )
+        ind_to_name[ind] = key
+
+    while ind_to_name and json.get(ind_to_name[-1], None) is None:
+        ind_to_name.pop()
+
+    def serialize_file(name, ser):
+        if json.get(name, None) is None:
+            return
         ser.reset_garbage_pos()
-        with open(fname, "rb") as f:
+        with open(name_to_fname[name], "rb") as f:
             ser.add(f.read())
         ser.align_garbage(16)
 
     with open(out_filename, "wb") as f:
-        n = range(len(inputs))
-        f.write(serialize_seqfile(inputs, serialize_file, n, 3, extra_padding=False))
+        n = range(len(ind_to_name))
+        f.write(serialize_seqfile(ind_to_name, serialize_file, n, 3, False))
+
+    with open(out_bank_sets, "wb") as f:
+        ser = ReserveSerializer()
+        table = ser.reserve(len(ind_to_name) * 2)
+        for name in ind_to_name:
+            bank_set = json.get(name, None)
+            if bank_set is None:
+                bank_set = []
+            table.append(pack("H", ser.size))
+            ser.add(bytes([len(bank_set)]))
+            for bank in bank_set[::-1]:
+                ser.add(bytes([bank_names.index(bank)]))
+        ser.align(16)
+        f.write(ser.finish())
 
 
 def main():
     global STACK_TRACES
+    global ENDIAN_MARKER
+    global WORD_BYTES
     need_help = False
-    skip_next = False
+    skip_next = 0
     cpp_command = None
     print_samples = False
     sequences_out_file = None
     defines = []
     args = []
     for i, a in enumerate(sys.argv[1:], 1):
-        if skip_next:
-            skip_next = False
+        if skip_next > 0:
+            skip_next -= 1
             continue
         if a == "--help" or a == "-h":
             need_help = True
         elif a == "--cpp":
             cpp_command = sys.argv[i + 1]
-            skip_next = True
+            skip_next = 1
         elif a == "-D":
             defines.append(sys.argv[i + 1])
-            skip_next = True
+            skip_next = 1
+        elif a == "--endian":
+            endian = sys.argv[i + 1]
+            if endian == "big":
+                ENDIAN_MARKER = ">"
+            elif endian == "little":
+                ENDIAN_MARKER = "<"
+            elif endian == "native":
+                ENDIAN_MARKER = "="
+            else:
+                fail("--endian takes argument big, little or native")
+            skip_next = 1
+        elif a == "--bitwidth":
+            bitwidth = sys.argv[i + 1]
+            if bitwidth == 'native':
+                WORD_BYTES = struct.calcsize('P')
+            else:
+                if bitwidth not in ['32', '64']:
+                    fail("--bitwidth takes argument 32, 64 or native")
+                WORD_BYTES = int(bitwidth) // 8
+            skip_next = 1
         elif a.startswith("-D"):
             defines.append(a[2:])
         elif a == "--stack-trace":
@@ -710,15 +848,27 @@ def main():
             print_samples = True
         elif a == "--sequences":
             sequences_out_file = sys.argv[i + 1]
-            skip_next = True
+            bank_sets_out_file = sys.argv[i + 2]
+            sound_bank_dir = sys.argv[i + 3]
+            sequence_json = sys.argv[i + 4]
+            skip_next = 4
         elif a.startswith("-"):
             print("Unrecognized option " + a)
             sys.exit(1)
         else:
             args.append(a)
 
+    defines_set = {d.split("=")[0] for d in defines}
+
     if sequences_out_file is not None and not need_help:
-        write_sequences(args, sequences_out_file)
+        write_sequences(
+            args,
+            sequences_out_file,
+            bank_sets_out_file,
+            sound_bank_dir,
+            sequence_json,
+            defines_set,
+        )
         sys.exit(0)
 
     if need_help or len(args) != 4:
@@ -728,7 +878,8 @@ def main():
             " [--cpp <preprocessor>]"
             " [-D <symbol>]"
             " [--stack-trace]"
-            " | --sequences <out .bin file> <inputs...>".format(sys.argv[0])
+            " | --sequences <out sequence .bin> <out bank sets .bin> <sound bank dir> "
+            "<sequences.json> <inputs...>".format(sys.argv[0])
         )
         sys.exit(0 if need_help else 1)
 
@@ -736,8 +887,6 @@ def main():
     sound_bank_dir = args[1]
     ctl_data_out = args[2]
     tbl_data_out = args[3]
-
-    defines_set = {d.split("=")[0] for d in defines}
 
     banks = []
     sample_banks = []
@@ -785,7 +934,7 @@ def main():
 
             validate_bank_toplevel(bank_json)
             apply_version_diffs(bank_json, defines_set)
-            make_sound_json_uniform(bank_json)
+            normalize_sound_json(bank_json)
 
             sample_bank_name = bank_json["sample_bank"]
             validate(
@@ -803,7 +952,8 @@ def main():
         except Exception as e:
             fail("failed to parse bank " + fname + ": " + str(e))
 
-    sample_banks = [b for b in sample_banks if b.uses > 0]
+    sample_banks = [b for b in sample_banks if b.uses]
+    sample_banks.sort(key=lambda b: b.uses[0].name)
     sample_bank_index = {}
     for sample_bank in sample_banks:
         sample_bank_index[sample_bank] = len(sample_bank_index)

@@ -32,14 +32,14 @@
 #define OBJ_FLAG_MOVE_XZ_USING_FVEL               (1 <<  1) // 0x00000002
 #define OBJ_FLAG_MOVE_Y_WITH_TERMINAL_VEL         (1 <<  2) // 0x00000004
 #define OBJ_FLAG_SET_FACE_YAW_TO_MOVE_YAW         (1 <<  3) // 0x00000008
-#define OBJ_FLAG_0010                             (1 <<  4) // 0x00000010
+#define OBJ_FLAG_SET_FACE_ANGLE_TO_MOVE_ANGLE     (1 <<  4) // 0x00000010
 #define OBJ_FLAG_0020                             (1 <<  5) // 0x00000020
 #define OBJ_FLAG_COMPUTE_DIST_TO_MARIO            (1 <<  6) // 0x00000040
 #define OBJ_FLAG_ACTIVE_FROM_AFAR                 (1 <<  7) // 0x00000080
 #define OBJ_FLAG_0100                             (1 <<  8) // 0x00000100
 #define OBJ_FLAG_TRANSFORM_RELATIVE_TO_PARENT     (1 <<  9) // 0x00000200
 #define OBJ_FLAG_HOLDABLE                         (1 << 10) // 0x00000400
-#define OBJ_FLAG_0800                             (1 << 11) // 0x00000800
+#define OBJ_FLAG_SET_THROW_MATRIX_FROM_TRANSFORM  (1 << 11) // 0x00000800
 #define OBJ_FLAG_1000                             (1 << 12) // 0x00001000
 #define OBJ_FLAG_COMPUTE_ANGLE_TO_MARIO           (1 << 13) // 0x00002000
 #define OBJ_FLAG_PERSISTENT_RESPAWN               (1 << 14) // 0x00004000
@@ -59,8 +59,8 @@
 #define DIALOG_UNK1_AWAIT_DIALOG 3
 #define DIALOG_UNK1_DISABLE_TIME_STOP 4
 
-#define DIALOG_UNK1_FLAG_1 (1 << 1) // 0x02
-#define DIALOG_UNK1_FLAG_2 (1 << 2) // 0x04
+#define DIALOG_UNK1_FLAG_DEFAULT (1 << 1) // 0x02
+#define DIALOG_UNK1_FLAG_RESPONSE (1 << 2) // 0x04
 #define DIALOG_UNK1_FLAG_4 (1 << 4) // 0x10
 
 #define DIALOG_UNK2_ENABLE_TIME_STOP 0
@@ -84,7 +84,7 @@
 #define OBJ_MOVE_HIT_WALL              (1 <<  9) // 0x0200
 #define OBJ_MOVE_HIT_EDGE              (1 << 10) // 0x0400
 #define OBJ_MOVE_ABOVE_LAVA            (1 << 11) // 0x0800
-#define OBJ_MOVE_LEAVING_WATER                    (1 << 12) // 0x1000
+#define OBJ_MOVE_LEAVING_WATER         (1 << 12) // 0x1000
 #define OBJ_MOVE_13                    (1 << 13) // 0x2000
 #ifndef VERSION_JP
 #define OBJ_MOVE_ABOVE_DEATH_BARRIER   (1 << 14) // 0x4000
@@ -99,26 +99,33 @@
     OBJ_MOVE_UNDERWATER_ON_GROUND)
 #define OBJ_MOVE_MASK_HIT_WALL_OR_IN_WATER \
     (OBJ_MOVE_HIT_WALL | OBJ_MOVE_MASK_IN_WATER)
+#define OBJ_MOVE_MASK_NOT_AIR (\
+    OBJ_MOVE_LANDED |\
+    OBJ_MOVE_ON_GROUND |\
+    OBJ_MOVE_AT_WATER_SURFACE |\
+    OBJ_MOVE_UNDERWATER_ON_GROUND)
 
 /* oActiveParticleFlags */
-#define ACTIVE_PARTICLE_0    0x00000001
-#define ACTIVE_PARTICLE_3    0x00000008
-#define ACTIVE_PARTICLE_4    0x00000010
-#define ACTIVE_PARTICLE_5    0x00000020
-#define ACTIVE_PARTICLE_6    0x00000040
-#define ACTIVE_PARTICLE_7    0x00000080
-#define ACTIVE_PARTICLE_8    0x00000100
-#define ACTIVE_PARTICLE_9    0x00000200
-#define ACTIVE_PARTICLE_10   0x00000400
-#define ACTIVE_PARTICLE_11   0x00000800
-#define ACTIVE_PARTICLE_12   0x00001000
-#define ACTIVE_PARTICLE_13   0x00002000
-#define ACTIVE_PARTICLE_14   0x00004000
-#define ACTIVE_PARTICLE_15   0x00008000
-#define ACTIVE_PARTICLE_16   0x00010000
-#define ACTIVE_PARTICLE_17   0x00020000
-#define ACTIVE_PARTICLE_18   0x00040000
-#define ACTIVE_PARTICLE_19   0x00080000
+#define ACTIVE_PARTICLE_DUST                 (1 <<  0) // 0x00000001
+#define ACTIVE_PARTICLE_UNUSED_1             (1 <<  1) // 0x00000002
+#define ACTIVE_PARTICLE_UNUSED_2             (1 <<  2) // 0x00000004
+#define ACTIVE_PARTICLE_SPARKLES             (1 <<  3) // 0x00000008
+#define ACTIVE_PARTICLE_H_STAR               (1 <<  4) // 0x00000010
+#define ACTIVE_PARTICLE_BUBBLE               (1 <<  5) // 0x00000020
+#define ACTIVE_PARTICLE_WATER_SPLASH         (1 <<  6) // 0x00000040
+#define ACTIVE_PARTICLE_IDLE_WATER_WAVE      (1 <<  7) // 0x00000080
+#define ACTIVE_PARTICLE_SHALLOW_WATER_WAVE   (1 <<  8) // 0x00000100
+#define ACTIVE_PARTICLE_PLUNGE_BUBBLE        (1 <<  9) // 0x00000200
+#define ACTIVE_PARTICLE_WAVE_TRAIL           (1 << 10) // 0x00000400
+#define ACTIVE_PARTICLE_FIRE                 (1 << 11) // 0x00000800
+#define ACTIVE_PARTICLE_SHALLOW_WATER_SPLASH (1 << 12) // 0x00001000
+#define ACTIVE_PARTICLE_LEAF                 (1 << 13) // 0x00002000
+#define ACTIVE_PARTICLE_DIRT                 (1 << 14) // 0x00004000
+#define ACTIVE_PARTICLE_MIST_CIRCLE          (1 << 15) // 0x00008000
+#define ACTIVE_PARTICLE_SNOW                 (1 << 16) // 0x00010000
+#define ACTIVE_PARTICLE_BREATH               (1 << 17) // 0x00020000
+#define ACTIVE_PARTICLE_V_STAR               (1 << 18) // 0x00040000
+#define ACTIVE_PARTICLE_TRIANGLE             (1 << 19) // 0x00080000
 
 /* oAction */
 #define OBJ_ACT_LAVA_DEATH 100
@@ -191,6 +198,24 @@
     /* oBobombBuddyHasTalkedToMario */
     #define BOBOMB_BUDDY_HAS_NOT_TALKED 0
     #define BOBOMB_BUDDY_HAS_TALKED 2
+
+/* Fish */
+    /* oAction */
+    #define FISH_ACT_INIT 0
+    #define FISH_ACT_ACTIVE 1
+    #define FISH_ACT_RESPAWN 2
+
+/* Blue_Fish */
+    /* oAction */
+    #define BLUE_FISH_ACT_DIVE 0
+    #define BLUE_FISH_ACT_TURN 1
+    #define BLUE_FISH_ACT_ASCEND 2
+    #define BLUE_FISH_ACT_TURN_BACK 3
+    
+    /* oAction: bhv_blue_fish_spawn_loop */
+    #define BLUE_FISH_ACT_SPAWN 0
+    #define BLUE_FISH_ACT_ROOM 1
+    #define BLUE_FISH_ACT_DUPLICATE 2
 
 /* Cannon Trap Door */
     /* oAction */
@@ -347,6 +372,11 @@
     #define BOO_DEATH_STATUS_DYING 1
     #define BOO_DEATH_STATUS_DEAD 2
 
+    /* attackStatus */
+    #define BOO_NOT_ATTACKED 0
+    #define BOO_ATTACKED 1
+    #define BOO_BOUNCED_ON -1
+
 /* Beta Boo Key */
     /* oAction */
     #define BETA_BOO_KEY_ACT_IN_BOO 0
@@ -371,6 +401,18 @@
     #define BBH_NEAR_MERRY_GO_ROUND_ROOM 10
     #define BBH_DYNAMIC_SURFACE_ROOM 0
     #define BBH_OUTSIDE_ROOM 13
+
+/* Coffin Spawner */
+    /* oAction */
+    #define COFFIN_SPAWNER_ACT_COFFINS_UNLOADED 0
+
+/* Coffin */
+    /* oAction */
+    #define COFFIN_ACT_IDLE     0
+    #define COFFIN_ACT_STAND_UP 1
+
+    /* oBehParams2ndByte */
+    #define COFFIN_BP_STATIC 0
 
 /* WDW Arrow Lift */
     /* oAction */
@@ -569,6 +611,82 @@
     #define MONTY_MOLE_ROCK_ACT_HELD 0
     #define MONTY_MOLE_ROCK_ACT_MOVE 1
 
+/* Ukiki */
+    /* oAction */
+    #define UKIKI_ACT_IDLE            0
+    #define UKIKI_ACT_RUN             1
+    #define UKIKI_ACT_TURN_TO_MARIO   2
+    #define UKIKI_ACT_JUMP            3
+    #define UKIKI_ACT_GO_TO_CAGE      4
+    #define UKIKI_ACT_WAIT_TO_RESPAWN 5
+    #define UKIKI_ACT_UNUSED_TURN     6
+    #define UKIKI_ACT_RETURN_HOME     7
+
+    /* oSubAction */
+    #define UKIKI_SUB_ACT_TAUNT_NONE       0
+    #define UKIKI_SUB_ACT_TAUNT_ITCH       1
+    #define UKIKI_SUB_ACT_TAUNT_SCREECH    2
+    #define UKIKI_SUB_ACT_TAUNT_JUMP_CLAP  3
+    #define UKIKI_SUB_ACT_TAUNT_HANDSTAND  4
+
+    #define UKIKI_SUB_ACT_CAGE_RUN_TO_CAGE    0
+    #define UKIKI_SUB_ACT_CAGE_WAIT_FOR_MARIO 1
+    #define UKIKI_SUB_ACT_CAGE_TALK_TO_MARIO  2
+    #define UKIKI_SUB_ACT_CAGE_TURN_TO_CAGE   3
+    #define UKIKI_SUB_ACT_CAGE_JUMP_TO_CAGE   4
+    #define UKIKI_SUB_ACT_CAGE_LAND_ON_CAGE   5
+    #define UKIKI_SUB_ACT_CAGE_SPIN_ON_CAGE   6
+    #define UKIKI_SUB_ACT_CAGE_DESPAWN        7
+
+    /* oUkikiTextState */
+    #define UKIKI_TEXT_DEFAULT       0
+    #define UKIKI_TEXT_CAGE_TEXTBOX  1
+    #define UKIKI_TEXT_GO_TO_CAGE    2
+    #define UKIKI_TEXT_STOLE_HAT     3
+    #define UKIKI_TEXT_HAS_HAT       4
+    #define UKIKI_TEXT_GAVE_HAT_BACK 5
+    #define UKIKI_TEXT_DO_NOT_LET_GO 6
+    #define UKIKI_TEXT_STEAL_HAT     7
+
+    /* oBehParams2ndByte */
+    #define UKIKI_CAGE 0
+    #define UKIKI_HAT  1
+
+    /* Animations */
+    #define UKIKI_ANIM_RUN           0
+    #define UKIKI_ANIM_UNUSED_WALK   1
+    #define UKIKI_ANIM_UNUSED_APOSE  2
+    #define UKIKI_ANIM_UNUSED_DEATH  3
+    #define UKIKI_ANIM_SCREECH       4
+    #define UKIKI_ANIM_JUMP_CLAP     5
+    #define UKIKI_ANIM_UNUSED_HOP    6
+    #define UKIKI_ANIM_LAND          7
+    #define UKIKI_ANIM_JUMP          8
+    #define UKIKI_ANIM_ITCH          9
+    #define UKIKI_ANIM_HANDSTAND    10
+    #define UKIKI_ANIM_TURN         11
+    #define UKIKI_ANIM_HELD         12
+
+    /* oAnimState */
+    #define UKIKI_ANIM_STATE_DEFAULT    0
+    #define UKIKI_ANIM_STATE_EYE_CLOSED 1
+    #define UKIKI_ANIM_STATE_HAT_ON     2
+
+    /* oUkikiHasHat */
+    #define UKIKI_HAT_ON 1
+
+/* Ukiki Cage Star */
+    /* oAction */
+    #define UKIKI_CAGE_STAR_ACT_IN_CAGE    0
+    #define UKIKI_CAGE_STAR_ACT_SPAWN_STAR 1
+
+/* Ukiki Cage */
+    /* oAction */
+    #define UKIKI_CAGE_ACT_WAIT_FOR_UKIKI 0
+    #define UKIKI_CAGE_ACT_SPIN           1
+    #define UKIKI_CAGE_ACT_FALL           2
+    #define UKIKI_CAGE_ACT_HIDE           3
+
 /* Piranha Plant */
     /* oAction */
     #define PIRANHA_PLANT_ACT_IDLE 0
@@ -635,10 +753,37 @@
     #define PYRAMID_WALL_BP_POSITION_MIDDLE 1
     #define PYRAMID_WALL_BP_POSITION_LOW 2
 
-/* Tuxie */
+/* Penguins (general) */
     /* Walking sounds */
     #define PENGUIN_WALK_BABY 0
     #define PENGUIN_WALK_BIG  1
+    
+    /* Animations */
+    #define PENGUIN_ANIM_WALK 0
+    #define PENGUIN_ANIM_IDLE 3
+    
+/* Racing penguin */
+    /* oAction */
+    #define RACING_PENGUIN_ACT_WAIT_FOR_MARIO 0
+    #define RACING_PENGUIN_ACT_SHOW_INIT_TEXT 1
+    #define RACING_PENGUIN_ACT_PREPARE_FOR_RACE 2
+    #define RACING_PENGUIN_ACT_RACE 3
+    #define RACING_PENGUIN_ACT_FINISH_RACE 4
+    #define RACING_PENGUIN_ACT_SHOW_FINAL_TEXT 5
+    
+/* SL walking penguin */
+    /* oAction */
+    #define SL_WALKING_PENGUIN_ACT_MOVING_FORWARDS 0
+    #define SL_WALKING_PENGUIN_ACT_TURNING_BACK 1
+    #define SL_WALKING_PENGUIN_ACT_RETURNING 2
+    #define SL_WALKING_PENGUIN_ACT_TURNING_FORWARDS 3
+    
+/* Snowman wind */
+    /* oSubAction */
+    #define SL_SNOWMAN_WIND_ACT_IDLE 0
+    #define SL_SNOWMAN_WIND_ACT_TALKING 1
+    #define SL_SNOWMAN_WIND_ACT_BLOWING 2
+
 
 /* Water bomb */
     /* oAction */
@@ -752,20 +897,27 @@
     #define BIRD_BP_SPAWNED 0
     #define BIRD_BP_SPAWNER 1
 
-/* Racing penguin */
-    /* oAction */
-    #define RACING_PENGUIN_ACT_WAIT_FOR_MARIO 0
-    #define RACING_PENGUIN_ACT_SHOW_INIT_TEXT 1
-    #define RACING_PENGUIN_ACT_PREPARE_FOR_RACE 2
-    #define RACING_PENGUIN_ACT_RACE 3
-    #define RACING_PENGUIN_ACT_FINISH_RACE 4
-    #define RACING_PENGUIN_ACT_SHOW_FINAL_TEXT 5
-
 /* Skeeter */
     /* oAction */
     #define SKEETER_ACT_IDLE 0
     #define SKEETER_ACT_LUNGE 1
     #define SKEETER_ACT_WALK 2
+
+/* Snufit */
+    /* oAction */
+    #define SNUFIT_ACT_IDLE  0
+    #define SNUFIT_ACT_SHOOT 1
+
+/* Tweester */
+    /* oAction */
+    #define TWEESTER_ACT_IDLE  0
+    #define TWEESTER_ACT_CHASE 1
+    #define TWEESTER_ACT_HIDE  2
+
+    /* oSubAction */
+    #define TWEESTER_SUB_ACT_WAIT  0
+
+    #define TWEESTER_SUB_ACT_CHASE 0
 
 /* Triplet butterfly */
     /* oAction */

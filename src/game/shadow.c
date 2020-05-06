@@ -12,10 +12,11 @@
 #include "mario.h"
 #include "memory.h"
 #include "rendering_graph_node.h"
-#include "room.h"
+#include "object_list_processor.h"
 #include "segment2.h"
 #include "save_file.h"
 #include "geo_misc.h"
+#include "level_table.h"
 
 /**
  * @file shadow.c
@@ -105,10 +106,10 @@ shadowRectangle rectangles[2] = {
 };
 
 // See shadow.h for documentation.
-s8 sMarioOnFlyingCarpet;
-s16 sSurfaceTypeBelowShadow;
 s8 gShadowAboveWaterOrLava;
 s8 gMarioOnIceOrCarpet;
+s8 sMarioOnFlyingCarpet;
+s16 sSurfaceTypeBelowShadow;
 
 /**
  * Let (oldZ, oldX) be the relative coordinates of a point on a rectangle,
@@ -734,8 +735,8 @@ Gfx *create_shadow_circle_assuming_flat_ground(f32 xPos, f32 yPos, f32 zPos, s16
  * underneath the shadow is totally flat.
  */
 Gfx *create_shadow_rectangle(f32 halfWidth, f32 halfLength, f32 relY, u8 solidity) {
-    Vtx *verts = alloc_display_list(64);
-    Gfx *displayList = alloc_display_list(40);
+    Vtx *verts = alloc_display_list(4 * sizeof(Vtx));
+    Gfx *displayList = alloc_display_list(5 * sizeof(Gfx));
     f32 frontLeftX, frontLeftZ, frontRightX, frontRightZ, backLeftX, backLeftZ, backRightX, backRightZ;
 
     if (verts == NULL || displayList == NULL) {

@@ -1,8 +1,8 @@
 // explosion.c.inc
 
 void bhv_explosion_init(void) {
-    create_sound_spawner(SOUND_CH8_UNK2E);
-    set_camera_shake_2(SHAKE_2_UNKNOWN_1);
+    create_sound_spawner(SOUND_GENERAL2_BOBOMB_EXPLOSION);
+    set_environmental_camera_shake(SHAKE_ENV_EXPLOSION);
 
     o->oOpacity = 255;
 }
@@ -22,5 +22,5 @@ void bhv_explosion_loop(void) {
 
     o->oOpacity -= 14;
 
-    obj_scale((f32) o->oTimer / 9.0f + 1.0);
+    cur_obj_scale((f32) o->oTimer / 9.0f + 1.0);
 }

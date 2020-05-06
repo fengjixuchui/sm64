@@ -3,8 +3,7 @@
 #include "area.h"
 #include "sm64.h"
 #include "behavior_data.h"
-#include "game.h"
-#include "display.h"
+#include "game_init.h"
 #include "object_list_processor.h"
 #include "engine/surface_load.h"
 #include "ingame_menu.h"
@@ -19,6 +18,7 @@
 #include "level_update.h"
 #include "engine/geo_layout.h"
 #include "save_file.h"
+#include "level_table.h"
 
 struct SpawnInfo gPlayerSpawnInfos[1];
 struct GraphNode *D_8033A160[0x100];
@@ -30,8 +30,8 @@ s16 gCurrCourseNum;
 s16 gCurrActNum;
 s16 gCurrAreaIndex;
 s16 gSavedCourseNum;
-s16 D_8033A75E;
-s16 D_8033A760;
+s16 gPauseScreenMode;
+s16 gSaveOptSelectIndex;
 
 struct SpawnInfo *gMarioSpawnInfo = &gPlayerSpawnInfos[0];
 struct GraphNode **gLoadedGraphNodes = D_8033A160;
@@ -47,19 +47,30 @@ u8 gWarpTransRed = 0;
 u8 gWarpTransGreen = 0;
 u8 gWarpTransBlue = 0;
 s16 gCurrSaveFileNum = 1;
-s16 gCurrLevelNum = 1;
+s16 gCurrLevelNum = LEVEL_MIN;
 
-void *D_8032CE9C[] = {
-    bhvDoorWarp, bhvStar,    bhvExitPodiumWarp, bhvWarp,    bhvWarpPipe, bhvFadingWarp, bhvWarps60,
-    bhvWarps64,  bhvWarps68, bhvWarps6C,        bhvWarps70, bhvWarps74,  bhvWarps78,    bhvWarps94,
-    bhvWarps7C,  bhvWarps80, bhvWarps88,        bhvWarps84, bhvWarps8C,  bhvWarps90,
+/* 
+ * The following two tables are used in get_mario_spawn_type() to determine spawn type
+ * from warp behavior.
+ * When looping through sWarpBhvSpawnTable, if the behavior function in the table matches
+ * the spawn behavior executed, the index of that behavior is used with sSpawnTypeFromWarpBhv
+*/
+
+// D_8032CE9C
+const BehaviorScript *sWarpBhvSpawnTable[] = {
+    bhvDoorWarp, bhvStar,       bhvExitPodiumWarp, bhvWarp,
+    bhvWarpPipe, bhvFadingWarp, bhvWarps60,        bhvWarps64,
+    bhvWarps68,  bhvWarps6C,    bhvDeathWarp,      bhvWarps74,
+    bhvWarps78,  bhvWarps94,    bhvWarps7C,        bhvPaintingDeathWarp,
+    bhvWarps88,  bhvWarps84,    bhvWarps8C,        bhvWarps90,
 };
 
-u8 D_8032CEEC[] = {
+// D_8032CEEC
+u8 sSpawnTypeFromWarpBhv[] = {
     MARIO_SPAWN_UNKNOWN_01, MARIO_SPAWN_UNKNOWN_02, MARIO_SPAWN_UNKNOWN_03, MARIO_SPAWN_UNKNOWN_03,
     MARIO_SPAWN_UNKNOWN_03, MARIO_SPAWN_UNKNOWN_04, MARIO_SPAWN_UNKNOWN_10, MARIO_SPAWN_UNKNOWN_12,
-    MARIO_SPAWN_UNKNOWN_13, MARIO_SPAWN_UNKNOWN_14, MARIO_SPAWN_UNKNOWN_15, MARIO_SPAWN_UNKNOWN_16,
-    MARIO_SPAWN_UNKNOWN_17, MARIO_SPAWN_UNKNOWN_11, MARIO_SPAWN_UNKNOWN_20, MARIO_SPAWN_UNKNOWN_21,
+    MARIO_SPAWN_UNKNOWN_13, MARIO_SPAWN_UNKNOWN_14, MARIO_SPAWN_DEATH,      MARIO_SPAWN_UNKNOWN_16,
+    MARIO_SPAWN_UNKNOWN_17, MARIO_SPAWN_UNKNOWN_11, MARIO_SPAWN_UNKNOWN_20, MARIO_SPAWN_PAINTING_DEATH,
     MARIO_SPAWN_UNKNOWN_22, MARIO_SPAWN_UNKNOWN_23, MARIO_SPAWN_UNKNOWN_24, MARIO_SPAWN_UNKNOWN_25,
 };
 
@@ -76,7 +87,7 @@ const char *gNoControllerMsg[] = {
 };
 #endif
 
-void func_8027A220(Vp *a, Vp *b, u8 c, u8 d, u8 e) {
+void override_viewport_and_clip(Vp *a, Vp *b, u8 c, u8 d, u8 e) {
     u16 sp6 = ((c >> 3) << 11) | ((d >> 3) << 6) | ((e >> 3) << 1) | 1;
 
     gFBSetColor = (sp6 << 16) | sp6;
@@ -106,7 +117,7 @@ void print_intro_text(void) {
 #endif
         } else {
 #ifdef VERSION_EU
-            print_text_centered(20, 20, "START");
+            print_text(20, 20, "START");
 #else
             print_text_centered(60, 38, "PRESS");
             print_text_centered(60, 20, "START");
@@ -117,11 +128,12 @@ void print_intro_text(void) {
 
 u32 get_mario_spawn_type(struct Object *o) {
     s32 i;
-    void *behavior = virtual_to_segmented(0x13, o->behavior);
+    const BehaviorScript *behavior = virtual_to_segmented(0x13, o->behavior);
 
     for (i = 0; i < 20; i++) {
-        if (D_8032CE9C[i] == behavior)
-            return D_8032CEEC[i];
+        if (sWarpBhvSpawnTable[i] == behavior) {
+            return sSpawnTypeFromWarpBhv[i];
+        }
     }
     return 0;
 }
@@ -130,19 +142,20 @@ struct ObjectWarpNode *area_get_warp_node(u8 id) {
     struct ObjectWarpNode *node = NULL;
 
     for (node = gCurrentArea->warpNodes; node != NULL; node = node->next) {
-        if (node->node.id == id)
+        if (node->node.id == id) {
             break;
+        }
     }
     return node;
 }
 
-struct ObjectWarpNode *func_8027A478(struct Object *o) {
+struct ObjectWarpNode *area_get_warp_node_from_params(struct Object *o) {
     u8 sp1F = (o->oBehParams & 0x00FF0000) >> 16;
 
     return area_get_warp_node(sp1F);
 }
 
-void func_8027A4C4(void) {
+void load_obj_warp_nodes(void) {
     struct ObjectWarpNode *sp24;
     struct Object *sp20 = (struct Object *) gObjParentGraphNode.children;
 
@@ -150,9 +163,10 @@ void func_8027A4C4(void) {
         struct Object *sp1C = sp20;
 
         if (sp1C->activeFlags && get_mario_spawn_type(sp1C) != 0) {
-            sp24 = func_8027A478(sp1C);
-            if (sp24 != NULL)
+            sp24 = area_get_warp_node_from_params(sp1C);
+            if (sp24 != NULL) {
                 sp24->object = sp1C;
+            }
         }
     } while ((sp20 = (struct Object *) sp20->header.gfx.node.next)
              != (struct Object *) gObjParentGraphNode.children);
@@ -189,13 +203,13 @@ void clear_areas(void) {
     }
 }
 
-void func_8027A7C4(void) {
+void clear_area_graph_nodes(void) {
     s32 i;
 
     if (gCurrentArea != NULL) {
         geo_call_global_function_nodes(gCurrentArea->unk04, GEO_CONTEXT_AREA_UNLOAD);
         gCurrentArea = NULL;
-        gWarpTransition.isActive = 0;
+        gWarpTransition.isActive = FALSE;
     }
 
     for (i = 0; i < 8; i++) {
@@ -216,22 +230,23 @@ void load_area(s32 index) {
                               gCurrentArea->macroObjects);
         }
 
-        if (gCurrentArea->objectSpawnInfos != NULL)
+        if (gCurrentArea->objectSpawnInfos != NULL) {
             spawn_objects_from_info(0, gCurrentArea->objectSpawnInfos);
+        }
 
-        func_8027A4C4();
+        load_obj_warp_nodes();
         geo_call_global_function_nodes(gCurrentArea->unk04, GEO_CONTEXT_AREA_LOAD);
     }
 }
 
-void func_8027A998(void) {
+void unload_area(void) {
     if (gCurrentArea != NULL) {
         unload_objects_from_area(0, gCurrentArea->index);
         geo_call_global_function_nodes(gCurrentArea->unk04, GEO_CONTEXT_AREA_UNLOAD);
 
         gCurrentArea->flags = 0;
         gCurrentArea = NULL;
-        gWarpTransition.isActive = 0;
+        gWarpTransition.isActive = FALSE;
     }
 }
 
@@ -245,13 +260,14 @@ void load_mario_area(void) {
     }
 }
 
-void func_8027AA88(void) {
+void unload_mario_area(void) {
     if (gCurrentArea != NULL && (gCurrentArea->flags & 0x01)) {
         unload_objects_from_area(0, gMarioSpawnInfo->activeAreaIndex);
 
         gCurrentArea->flags &= ~0x01;
-        if (gCurrentArea->flags == 0)
-            func_8027A998();
+        if (gCurrentArea->flags == 0) {
+            unload_area();
+        }
     }
 }
 
@@ -259,7 +275,7 @@ void change_area(s32 index) {
     s32 areaFlags = gCurrentArea->flags;
 
     if (gCurrAreaIndex != index) {
-        func_8027A998();
+        unload_area();
         load_area(index);
 
         gCurrentArea->flags = areaFlags;
@@ -293,40 +309,42 @@ void play_transition(s16 transType, s16 time, u8 red, u8 green, u8 blue) {
         red = gWarpTransRed, green = gWarpTransGreen, blue = gWarpTransBlue;
     }
 
-    if (transType < 8) {
+    if (transType < 8) { // if transition is RGB
         gWarpTransition.data.red = red;
         gWarpTransition.data.green = green;
         gWarpTransition.data.blue = blue;
-    } else {
+    } else { // if transition is textured
         gWarpTransition.data.red = red;
         gWarpTransition.data.green = green;
         gWarpTransition.data.blue = blue;
 
-        // Both the start and end circles are always located in the middle of the screen.
+        // Both the start and end textured transition are always located in the middle of the screen.
         // If you really wanted to, you could place the start at one corner and the end at
         // the opposite corner. This will make the transition image look like it is moving
         // across the screen.
-        gWarpTransition.data.startCircleX = 160;
-        gWarpTransition.data.startCircleY = 120;
-        gWarpTransition.data.endCircleX = 160;
-        gWarpTransition.data.endCircleY = 120;
+        gWarpTransition.data.startTexX = SCREEN_WIDTH / 2;
+        gWarpTransition.data.startTexY = SCREEN_HEIGHT / 2;
+        gWarpTransition.data.endTexX = SCREEN_WIDTH / 2;
+        gWarpTransition.data.endTexY = SCREEN_HEIGHT / 2;
 
-        gWarpTransition.data.unk10 = 0;
+        gWarpTransition.data.texTimer = 0;
 
         if (transType & 1) // Is the image fading in?
         {
-            gWarpTransition.data.startCircleRadius = 320;
-            if (transType >= 0x0F)
-                gWarpTransition.data.endCircleRadius = 16;
-            else
-                gWarpTransition.data.endCircleRadius = 0;
+            gWarpTransition.data.startTexRadius = SCREEN_WIDTH;
+            if (transType >= 0x0F) {
+                gWarpTransition.data.endTexRadius = 16;
+            } else {
+                gWarpTransition.data.endTexRadius = 0;
+            }
         } else // The image is fading out. (Reverses start & end circles)
         {
-            if (transType >= 0x0E)
-                gWarpTransition.data.startCircleRadius = 16;
-            else
-                gWarpTransition.data.startCircleRadius = 0;
-            gWarpTransition.data.endCircleRadius = 320;
+            if (transType >= 0x0E) {
+                gWarpTransition.data.startTexRadius = 16;
+            } else {
+                gWarpTransition.data.startTexRadius = 0;
+            }
+            gWarpTransition.data.endTexRadius = SCREEN_WIDTH;
         }
     }
 }
@@ -347,36 +365,38 @@ void render_game(void) {
 
         gSPViewport(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(&D_8032CF00));
 
-        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, 320,
-                      240 - BORDER_HEIGHT);
+        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
+                      SCREEN_HEIGHT - BORDER_HEIGHT);
         render_hud();
 
-        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, 320, 240);
+        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         render_text_labels();
         do_cutscene_handler();
         print_displaying_credits_entry();
-        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, 320,
-                      240 - BORDER_HEIGHT);
-        D_8033A75E = func_802DCD98();
+        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
+                      SCREEN_HEIGHT - BORDER_HEIGHT);
+        gPauseScreenMode = render_menus_and_dialogs();
 
-        if (D_8033A75E != 0)
-            D_8033A760 = D_8033A75E;
-
-        if (D_8032CE78 != NULL)
+        if (gPauseScreenMode != 0) {
+            gSaveOptSelectIndex = gPauseScreenMode;
+        }
+        
+        if (D_8032CE78 != NULL) {
             make_viewport_clip_rect(D_8032CE78);
-        else
-            gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, 320,
-                          240 - BORDER_HEIGHT);
+        } else
+            gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
+                          SCREEN_HEIGHT - BORDER_HEIGHT);
 
         if (gWarpTransition.isActive) {
             if (gWarpTransDelay == 0) {
-                gWarpTransition.isActive = !func_802CC108(0, gWarpTransition.type, gWarpTransition.time,
+                gWarpTransition.isActive = !render_screen_transition(0, gWarpTransition.type, gWarpTransition.time,
                                                           &gWarpTransition.data);
                 if (!gWarpTransition.isActive) {
-                    if (gWarpTransition.type & 1)
+                    if (gWarpTransition.type & 1) {
                         gWarpTransition.pauseRendering = TRUE;
-                    else
+                    } else {
                         set_warp_transition_rgb(0, 0, 0);
+                    }
                 }
             } else {
                 gWarpTransDelay--;
@@ -384,10 +404,11 @@ void render_game(void) {
         }
     } else {
         render_text_labels();
-        if (D_8032CE78 != 0)
+        if (D_8032CE78 != 0) {
             clear_viewport(D_8032CE78, gWarpTransFBSetColor);
-        else
+        } else {
             clear_frame_buffer(gWarpTransFBSetColor);
+        }
     }
 
     D_8032CE74 = NULL;

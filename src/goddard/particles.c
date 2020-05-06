@@ -58,16 +58,18 @@ void func_80181C00(struct ObjVertex *vtx1, struct ObjVertex *vtx2) {
     struct GdObj *sp2C;
     register struct Links *link;
 
-    if (vtx1 == vtx2)
+    if (vtx1 == vtx2) {
         return;
+    }
     link = gGdSkinNet->unk1C0->link1C;
     while (link != NULL) {
         // FIXME: types
         struct Connection *sp24 = (void *) link->obj;
 
         if ((sp24->unk1C.vtx == vtx1 || sp24->unk1C.vtx == vtx2)
-            && (sp24->unk20.vtx == vtx1 || sp24->unk20.vtx == vtx2))
+            && (sp24->unk20.vtx == vtx1 || sp24->unk20.vtx == vtx2)) {
             break;
+        }
         link = link->next;
     }
     if (link == NULL) {
@@ -148,7 +150,7 @@ void func_80182088(struct Connection *cxn) {
     sp4C.x = sp1C->unk20.x - sp18->unk20.x;
     sp4C.y = sp1C->unk20.y - sp18->unk20.y;
     sp4C.z = sp1C->unk20.z - sp18->unk20.z;
-    sp20 = magnitude_vec3f(&sp4C);
+    sp20 = gd_vec3f_magnitude(&sp4C);
     sp24 = sp20 - cxn->unk24;
     sp4C.x /= sp20;
     sp4C.y /= sp20;
@@ -228,8 +230,9 @@ struct Connection *func_801825FC(struct ObjVertex *vtx1, struct ObjVertex *vtx2)
     struct GdVec3f sp28;
     struct GdVec3f sp1C;
 
-    if (sp34 == NULL)
+    if (sp34 == NULL) {
         fatal_print("Cant allocate connection memory!");
+    }
     sp34->unk1C.vtx = vtx1;
     sp34->unk20.vtx = vtx2;
     push_dynobj_stash();
@@ -240,12 +243,13 @@ struct Connection *func_801825FC(struct ObjVertex *vtx1, struct ObjVertex *vtx2)
     sp28.x -= sp1C.x;
     sp28.y -= sp1C.y;
     sp28.z -= sp1C.z;
-    sp34->unk24 = magnitude_vec3f(&sp28);
+    sp34->unk24 = gd_vec3f_magnitude(&sp28);
     // Duplicate conditional. Possibly should've checked `vtx2`;
     // Also, this shouldn't be called with particle types...
     if (vtx1->header.type == OBJ_TYPE_PARTICLES && vtx1->header.type == OBJ_TYPE_PARTICLES) {
-        if ((((struct ObjParticle *) vtx1)->unk54 & 4) && (((struct ObjParticle *) vtx2)->unk54 & 4))
+        if ((((struct ObjParticle *) vtx1)->unk54 & 4) && (((struct ObjParticle *) vtx2)->unk54 & 4)) {
             sp34->unk28 |= 1;
+        }
     }
     pop_dynobj_stash();
     return sp34;
@@ -299,7 +303,7 @@ void func_80182A08(struct ObjParticle *ptc, struct GdVec3f *b) {
                     sp20->unk38.x = func_8018D560() * 50.0 - 25.0;
                     sp20->unk38.y = func_8018D560() * 50.0 - 25.0;
                     sp20->unk38.z = func_8018D560() * 50.0 - 25.0;
-                } while (magnitude_vec3f(&sp20->unk38) > 30.0);
+                } while (gd_vec3f_magnitude(&sp20->unk38) > 30.0);
                 sp20->unk38.x += b->x;
                 sp20->unk38.y += b->y;
                 sp20->unk38.z += b->z;
@@ -325,10 +329,12 @@ void move_particle(struct ObjParticle *ptc) {
     struct GdVec3f sp40;
     struct GdVec3f sp34;
 
-    if (ptc->unk54 & 2)
+    if (ptc->unk54 & 2) {
         return;
-    if (!(ptc->unk54 & 8))
+    }
+    if (!(ptc->unk54 & 8)) {
         return;
+    }
     if (ptc->unk60 == 3) {
         sp40.x = -gViewUpdateCamera->unkE8[2][0] * 50.0f;
         sp40.y = -gViewUpdateCamera->unkE8[2][1] * 50.0f;
@@ -362,8 +368,9 @@ void move_particle(struct ObjParticle *ptc) {
     ptc->unk20.x += ptc->unk38.x;
     ptc->unk20.y += ptc->unk38.y;
     ptc->unk20.z += ptc->unk38.z;
-    if (ptc->unk54 & 1)
+    if (ptc->unk54 & 1) {
         ptc->unk38.y += sp7C;
+    }
     func_801838D0(ptc);
     if (ptc->unkB0 == 1) {
         if (0) {
@@ -421,7 +428,7 @@ void move_particle(struct ObjParticle *ptc) {
                             sp2C->unk38.x = func_8018D560() * 64.0 - 32.0;
                             sp2C->unk38.y = func_8018D560() * 64.0 - 32.0;
                             sp2C->unk38.z = func_8018D560() * 64.0 - 32.0;
-                        } while (magnitude_vec3f(&sp2C->unk38) > 32.0);
+                        } while (gd_vec3f_magnitude(&sp2C->unk38) > 32.0);
                         sp2C->unk30 = func_8018D560() * 180.0f;
                         sp2C->header.drawFlags &= ~OBJ_NOT_DRAWABLE;
                         sp2C->unk54 |= 8;
