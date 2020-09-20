@@ -1,33 +1,36 @@
-#include <ultra64.h>
+#include <PR/ultratypes.h>
 
 #include "sm64.h"
-#include "obj_behaviors.h"
-#include "rendering_graph_node.h"
-#include "memory.h"
-#include "engine/behavior_script.h"
-#include "engine/surface_collision.h"
-#include "engine/math_util.h"
-#include "object_helpers.h"
-#include "behavior_data.h"
-#include "mario.h"
-#include "game_init.h"
-#include "camera.h"
-#include "mario_actions_cutscene.h"
-#include "object_list_processor.h"
-#include "save_file.h"
 #include "area.h"
-#include "mario_misc.h"
-#include "level_update.h"
 #include "audio/external.h"
 #include "behavior_actions.h"
-#include "spawn_object.h"
-#include "spawn_sound.h"
+#include "behavior_data.h"
+#include "camera.h"
+#include "course_table.h"
+#include "dialog_ids.h"
+#include "engine/behavior_script.h"
+#include "engine/math_util.h"
+#include "engine/surface_collision.h"
 #include "envfx_bubbles.h"
+#include "game_init.h"
 #include "ingame_menu.h"
 #include "interaction.h"
+#include "level_misc_macros.h"
 #include "level_table.h"
-#include "dialog_ids.h"
-#include "course_table.h"
+#include "level_update.h"
+#include "levels/bob/header.h"
+#include "levels/ttm/header.h"
+#include "mario.h"
+#include "mario_actions_cutscene.h"
+#include "mario_misc.h"
+#include "memory.h"
+#include "obj_behaviors.h"
+#include "object_helpers.h"
+#include "object_list_processor.h"
+#include "rendering_graph_node.h"
+#include "save_file.h"
+#include "spawn_object.h"
+#include "spawn_sound.h"
 
 /**
  * @file obj_behaviors.c
@@ -104,7 +107,7 @@ Gfx UNUSED *geo_obj_transparency_something(s32 callContext, struct GraphNode *no
         gfxHead = alloc_display_list(3 * sizeof(Gfx));
         gfx = gfxHead;
         obj->header.gfx.node.flags =
-            (obj->header.gfx.node.flags & 0xFF) | (GRAPH_NODE_TYPE_FUNCTIONAL | GRAPH_NODE_TYPE_400); // sets bits 8, 10 and zeros upper byte
+            (obj->header.gfx.node.flags & 0xFF) | (GRAPH_NODE_TYPE_FUNCTIONAL | GRAPH_NODE_TYPE_400);
 
         gDPSetEnvColor(gfx++, 255, 255, 255, heldObject->oOpacity);
 
@@ -209,12 +212,12 @@ void obj_orient_graph(struct Object *obj, f32 normalX, f32 normalY, f32 normalZ)
     Mat4 *throwMatrix;
 
     // Passes on orienting certain objects that shouldn't be oriented, like boulders.
-    if (sOrientObjWithFloor == FALSE) {
+    if (!sOrientObjWithFloor) {
         return;
     }
 
     // Passes on orienting billboard objects, i.e. coins, trees, etc.
-    if ((obj->header.gfx.node.flags & GRAPH_RENDER_BILLBOARD) != 0) {
+    if (obj->header.gfx.node.flags & GRAPH_RENDER_BILLBOARD) {
         return;
     }
 
@@ -233,7 +236,7 @@ void obj_orient_graph(struct Object *obj, f32 normalX, f32 normalY, f32 normalZ)
     surfaceNormals[2] = normalZ;
 
     mtxf_align_terrain_normal(*throwMatrix, surfaceNormals, objVisualPosition, obj->oFaceAngleYaw);
-    obj->header.gfx.throwMatrix = (void *) throwMatrix;
+    obj->header.gfx.throwMatrix = throwMatrix;
 }
 
 /**
@@ -638,7 +641,7 @@ s32 obj_flicker_and_disappear(struct Object *obj, s16 lifeSpan) {
             obj->header.gfx.node.flags &= ~GRAPH_RENDER_INVISIBLE;
         }
     } else {
-        obj->activeFlags = 0;
+        obj->activeFlags = ACTIVE_FLAG_DEACTIVATED;
         return TRUE;
     }
 
@@ -678,9 +681,9 @@ s8 current_mario_room_check(s16 room) {
 s16 trigger_obj_dialog_when_facing(s32 *inDialog, s16 dialogID, f32 dist, s32 actionArg) {
     s16 dialogueResponse;
 
-    if ((is_point_within_radius_of_mario(o->oPosX, o->oPosY, o->oPosZ, (s32) dist) == 1
-         && obj_check_if_facing_toward_angle(o->oFaceAngleYaw, gMarioObject->header.gfx.angle[1] + 0x8000, 0x1000) == 1
-         && obj_check_if_facing_toward_angle(o->oMoveAngleYaw, o->oAngleToMario, 0x1000) == 1)
+    if ((is_point_within_radius_of_mario(o->oPosX, o->oPosY, o->oPosZ, (s32) dist) == TRUE
+         && obj_check_if_facing_toward_angle(o->oFaceAngleYaw, gMarioObject->header.gfx.angle[1] + 0x8000, 0x1000) == TRUE
+         && obj_check_if_facing_toward_angle(o->oMoveAngleYaw, o->oAngleToMario, 0x1000) == TRUE)
         || (*inDialog == 1)) {
         *inDialog = 1;
 
@@ -706,8 +709,7 @@ void obj_check_floor_death(s16 collisionFlags, struct Surface *floor) {
         return;
     }
 
-    if ((collisionFlags & OBJ_COL_FLAG_GROUNDED) == 1)
-    {
+    if ((collisionFlags & OBJ_COL_FLAG_GROUNDED) == OBJ_COL_FLAG_GROUNDED) {
         switch (floor->type) {
             case SURFACE_BURNING:
                 o->oAction = OBJ_ACT_LAVA_DEATH;
@@ -730,7 +732,7 @@ s32 obj_lava_death(void) {
     struct Object *deathSmoke;
 
     if (o->oTimer >= 31) {
-        o->activeFlags = 0;
+        o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
         return TRUE;
     } else {
         // Sinking effect
@@ -770,8 +772,7 @@ s8 sDebugSequenceTracker = 0;
 s8 sDebugTimer = 0;
 
 /**
- * Unused presumably debug function that tracks for a sequence of inputs,
- * perhaps for the Konami code sequence of inputs.
+ * Unused presumably debug function that tracks for a sequence of inputs.
  */
 s32 UNUSED debug_sequence_tracker(s16 debugInputSequence[]) {
     // If end of sequence reached, return true.
@@ -781,7 +782,7 @@ s32 UNUSED debug_sequence_tracker(s16 debugInputSequence[]) {
     }
 
     // If the third controller button pressed is next in sequence, reset timer and progress to next value.
-    if ((debugInputSequence[sDebugSequenceTracker] & gPlayer3Controller->buttonPressed) != 0) {
+    if (debugInputSequence[sDebugSequenceTracker] & gPlayer3Controller->buttonPressed) {
         sDebugSequenceTracker++;
         sDebugTimer = 0;
     // If wrong input or timer reaches 10, reset sequence progress.

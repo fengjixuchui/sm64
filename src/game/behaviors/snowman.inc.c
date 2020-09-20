@@ -66,7 +66,8 @@ void snowmans_bottom_act_1(void) {
 
     if (sp20 == -1) {
         sp1E = (u16) o->oAngleToMario - (u16) o->oMoveAngleYaw;
-        if (obj_check_if_facing_toward_angle(o->oMoveAngleYaw, o->oAngleToMario, 0x2000) == 1 && o->oSnowmansBottomUnk1AC == 1) {
+        if (obj_check_if_facing_toward_angle(o->oMoveAngleYaw, o->oAngleToMario, 0x2000) == TRUE
+            && o->oSnowmansBottomUnk1AC == 1) {
             o->oSnowmansBottomUnkF8 = o->oAngleToMario;
         } else {
             o->oSnowmansBottomUnkF8 = o->oMoveAngleYaw;
@@ -97,7 +98,7 @@ void snowmans_bottom_act_2(void) {
 
     if (o->oTimer == 200) {
         create_respawner(MODEL_CCM_SNOWMAN_BASE, bhvSnowmansBottom, 3000);
-        o->activeFlags = 0;
+        o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
     }
 }
 
@@ -228,9 +229,9 @@ void bhv_snowmans_head_loop(void) {
 void bhv_snowmans_body_checkpoint_loop(void) {
     if (is_point_within_radius_of_mario(o->oPosX, o->oPosY, o->oPosZ, 800)) {
         o->parentObj->oSnowmansBottomUnk1AC++;
-        o->activeFlags = 0;
+        o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
     }
 
-    if (o->parentObj->activeFlags == 0)
-        o->activeFlags = 0;
+    if (o->parentObj->activeFlags == ACTIVE_FLAG_DEACTIVATED)
+        o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
 }

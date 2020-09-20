@@ -301,17 +301,16 @@ struct MovtexObject gMovtexColored2[] = {
  * Sets the initial water level in Wet-Dry World based on how high Mario
  * jumped into the painting.
  */
-Gfx *geo_wdw_set_initial_water_level(s32 callContext, UNUSED struct GraphNode *node,
-                                     UNUSED f32 mtx[4][4]) {
+Gfx *geo_wdw_set_initial_water_level(s32 callContext, UNUSED struct GraphNode *node, UNUSED Mat4 mtx) {
     s32 i;
     UNUSED u8 unused[] = { 1, 0, 4, 0, 7, 0, 10, 0 };
     s16 wdwWaterHeight;
 
     // Why was this global variable needed when they could just check for GEO_CONTEXT_AREA_LOAD?
     if (callContext != GEO_CONTEXT_RENDER) {
-        gWdwWaterLevelSet = 0;
+        gWdwWaterLevelSet = FALSE;
     } else if (callContext == GEO_CONTEXT_RENDER && gEnvironmentRegions != NULL
-               && gWdwWaterLevelSet == 0) {
+               && !gWdwWaterLevelSet) {
         if (gPaintingMarioYEntry <= 1382.4) {
             wdwWaterHeight = 31;
         } else if (gPaintingMarioYEntry >= 1600.0) {
@@ -322,7 +321,7 @@ Gfx *geo_wdw_set_initial_water_level(s32 callContext, UNUSED struct GraphNode *n
         for (i = 0; i < *gEnvironmentRegions; i++) {
             gEnvironmentRegions[i * 6 + 6] = wdwWaterHeight;
         }
-        gWdwWaterLevelSet = 1;
+        gWdwWaterLevelSet = TRUE;
     }
     return NULL;
 }
@@ -332,7 +331,7 @@ Gfx *geo_wdw_set_initial_water_level(s32 callContext, UNUSED struct GraphNode *n
  * Textures update when gMovtexCounterPrev != gMovtexCounter.
  * This ensures water / sand flow stops when the game pauses.
  */
-Gfx *geo_movtex_pause_control(s32 callContext, UNUSED struct GraphNode *node, UNUSED f32 mtx[4][4]) {
+Gfx *geo_movtex_pause_control(s32 callContext, UNUSED struct GraphNode *node, UNUSED Mat4 mtx) {
     if (callContext != GEO_CONTEXT_RENDER) {
         gMovtexCounterPrev = gAreaUpdateCounter - 1;
         gMovtexCounter = gAreaUpdateCounter;
@@ -621,7 +620,7 @@ void movtex_change_texture_format(u32 quadCollectionId, Gfx **gfx) {
  * of the corresponding water region. The node's parameter determines which quad
  * collection is drawn, see moving_texture.h.
  */
-Gfx *geo_movtex_draw_water_regions(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]) {
+Gfx *geo_movtex_draw_water_regions(s32 callContext, struct GraphNode *node, UNUSED Mat4 mtx) {
     Gfx *gfxHead = NULL;
     Gfx *gfx = NULL;
     Gfx *subList;
@@ -649,7 +648,7 @@ Gfx *geo_movtex_draw_water_regions(s32 callContext, struct GraphNode *node, UNUS
             if (gLakituState.goalPos[1] < 1024.0) { // if camera under water
                 return NULL;
             }
-            if (save_file_get_star_flags(gCurrSaveFileNum - 1, 2) & 1) { // first level in JRB complete
+            if (save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_JRB - 1) & 1) { // first star in JRB complete
                 return NULL;
             }
         } else if (asGenerated->parameter == HMC_MOVTEX_TOXIC_MAZE_MIST) {
@@ -831,7 +830,7 @@ Gfx *movtex_gen_list(s16 *movtexVerts, struct MovtexObject *movtexList, s8 attrL
 /**
  * Function for a geo node that draws a MovtexObject in the gMovtexNonColored list.
  */
-Gfx *geo_movtex_draw_nocolor(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]) {
+Gfx *geo_movtex_draw_nocolor(s32 callContext, struct GraphNode *node, UNUSED Mat4 mtx) {
     s32 i;
     s16 *movtexVerts;
     struct GraphNodeGenerated *asGenerated;
@@ -859,7 +858,7 @@ Gfx *geo_movtex_draw_nocolor(s32 callContext, struct GraphNode *node, UNUSED f32
 /**
  * Function for a geo node that draws a MovtexObject in the gMovtexColored list.
  */
-Gfx *geo_movtex_draw_colored(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]) {
+Gfx *geo_movtex_draw_colored(s32 callContext, struct GraphNode *node, UNUSED Mat4 mtx) {
     s32 i;
     s16 *movtexVerts;
     struct GraphNodeGenerated *asGenerated;
@@ -890,7 +889,7 @@ Gfx *geo_movtex_draw_colored(s32 callContext, struct GraphNode *node, UNUSED f32
  * instances (like TTC treadmills) so you don't want the animation speed to
  * increase the more instances there are.
  */
-Gfx *geo_movtex_draw_colored_no_update(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]) {
+Gfx *geo_movtex_draw_colored_no_update(s32 callContext, struct GraphNode *node, UNUSED Mat4 mtx) {
     s32 i;
     s16 *movtexVerts;
     struct GraphNodeGenerated *asGenerated;
@@ -917,8 +916,7 @@ Gfx *geo_movtex_draw_colored_no_update(s32 callContext, struct GraphNode *node, 
  * Exact copy of geo_movtex_draw_colored_no_update, but now using the gMovtexColored2 array.
  * Used for the sand pits in SSL, both outside and inside the pyramid.
  */
-Gfx *geo_movtex_draw_colored_2_no_update(s32 callContext, struct GraphNode *node,
-                                         UNUSED f32 mtx[4][4]) {
+Gfx *geo_movtex_draw_colored_2_no_update(s32 callContext, struct GraphNode *node, UNUSED Mat4 mtx) {
     s32 i;
     s16 *movtexVerts;
     struct GraphNodeGenerated *asGenerated;
@@ -953,7 +951,7 @@ Gfx *geo_movtex_draw_colored_2_no_update(s32 callContext, struct GraphNode *node
  * model to update multiple times.
  * Note that the final TTC only has one big treadmill though.
  */
-Gfx *geo_movtex_update_horizontal(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]) {
+Gfx *geo_movtex_update_horizontal(s32 callContext, struct GraphNode *node, UNUSED Mat4 mtx) {
     void *movtexVerts;
 
     if (callContext == GEO_CONTEXT_RENDER) {

@@ -1,11 +1,11 @@
-#include <ultra64.h>
+#include <PR/ultratypes.h>
 
 #include "sm64.h"
-#include "mario.h"
 #include "debug.h"
-#include "spawn_object.h"
-#include "object_list_processor.h"
 #include "interaction.h"
+#include "mario.h"
+#include "object_list_processor.h"
+#include "spawn_object.h"
 
 struct Object *debug_print_obj_collision(struct Object *a) {
     struct Object *sp24;
@@ -22,7 +22,7 @@ struct Object *debug_print_obj_collision(struct Object *a) {
     return NULL;
 }
 
-int detect_object_hitbox_overlap(struct Object *a, struct Object *b) {
+s32 detect_object_hitbox_overlap(struct Object *a, struct Object *b) {
     f32 sp3C = a->oPosY - a->hitboxDownOffset;
     f32 sp38 = b->oPosY - b->hitboxDownOffset;
     f32 dx = a->oPosX - b->oPosX;
@@ -59,7 +59,7 @@ int detect_object_hitbox_overlap(struct Object *a, struct Object *b) {
     //! no return value
 }
 
-int detect_object_hurtbox_overlap(struct Object *a, struct Object *b) {
+s32 detect_object_hurtbox_overlap(struct Object *a, struct Object *b) {
     f32 sp3C = a->oPosY - a->hitboxDownOffset;
     f32 sp38 = b->oPosY - b->hitboxDownOffset;
     f32 sp34 = a->oPosX - b->oPosX;

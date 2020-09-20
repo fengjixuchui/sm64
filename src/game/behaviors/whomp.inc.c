@@ -1,7 +1,7 @@
 // whomp.c.inc
 
 void whomp_play_sfx_from_pound_animation(void) {
-    UNUSED s32 sp2C = o->header.gfx.unk38.animFrame;
+    UNUSED s32 sp2C = o->header.gfx.animInfo.animFrame;
     s32 sp28 = 0;
     if (o->oForwardVel < 5.0f) {
         sp28 = cur_obj_check_anim_frame(0);
@@ -122,13 +122,13 @@ void whomp_act_4(void) {
 }
 
 void whomp_act_5(void) {
-    if (o->oSubAction == 0 && o->oMoveFlags & 1) {
+    if (o->oSubAction == 0 && o->oMoveFlags & OBJ_MOVE_LANDED) {
         cur_obj_play_sound_2(SOUND_OBJ_WHOMP_LOWPRIO);
         cur_obj_shake_screen(SHAKE_POS_SMALL);
         o->oVelY = 0.0f;
         o->oSubAction++;
     }
-    if (o->oMoveFlags & 2)
+    if (o->oMoveFlags & OBJ_MOVE_ON_GROUND)
         o->oAction = 6;
 }
 
@@ -151,16 +151,16 @@ void king_whomp_on_ground(void) {
             }
             o->oSubAction++;
         }
-        o->oWhompUnkF8 = 0;
+        o->oWhompShakeVal = 0;
     } else {
-        if (o->oWhompUnkF8 < 10) {
-            if (o->oWhompUnkF8 % 2)
+        if (o->oWhompShakeVal < 10) {
+            if (o->oWhompShakeVal % 2)
                 o->oPosY += 8.0f;
             else
                 o->oPosY -= 8.0f;
         } else
             o->oSubAction = 10;
-        o->oWhompUnkF8++;
+        o->oWhompShakeVal++;
     }
 }
 
